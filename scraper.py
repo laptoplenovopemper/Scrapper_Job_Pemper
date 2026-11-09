@@ -21,14 +21,29 @@ APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LA
 
 def universal_date_converter(date_str):
     """
-    Fungsi konverter universal: Menerima segala jenis format tanggal mentah,
-    lalu menyeragamkannya menjadi format DD-MM-YY secara konsisten.
+    Konverter universal dengan penerjemah bulan bahasa Indonesia ke Inggris
+    agar sukses berjalan di server GitHub Actions (Linux).
     """
-    # Bersihkan dari teks status
     clean_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
     current_year = datetime.now().year
     
-    # Daftar berbagai variasi format tanggal yang mungkin muncul dari web
+    # Kamus mapping bulan Indonesia ke Inggris agar terbaca oleh server
+    bulan_indo = {
+        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 
+        'mei': 'May', 'jun': 'Jun', 'jul': 'Jul', 'agu': 'Aug', 
+        'sep': 'Sep', 'okt': 'Oct', 'nov': 'Nov', 'des': 'Dec',
+        'januari': 'January', 'februari': 'February', 'maret': 'March', 'april': 'April',
+        'mei': 'May', 'juni': 'June', 'juli': 'July', 'agustus': 'August',
+        'september': 'September', 'oktober': 'October', 'november': 'November', 'desember': 'December'
+    }
+    
+    # Terjemahkan teks bulan jika ada yang menggunakan bahasa Indonesia
+    lower_str = clean_str.lower()
+    for id_m, en_m in bulan_indo.items():
+        if id_m in lower_str:
+            clean_str = re.sub(id_m, en_m, lower_str, flags=re.IGNORECASE)
+            break
+            
     formats = [
         "%d %b %Y", "%d %b %y", "%d %B %Y", "%d %B", "%d %b", 
         "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d-%m-%y"
@@ -38,8 +53,7 @@ def universal_date_converter(date_str):
     for fmt in formats:
         try:
             if "%Y" not in fmt and "%y" not in fmt:
-                # Jika format tidak memiliki tahun, pasangkan dengan tahun aktif
-                parsed_date = datetime.strptime(f"{clean_str} {current_year}", f"{fmt} %Y")
+                parsed_date = datetime.strptime(f"{clean_str} {current_year}", f"%d %b %Y")
             else:
                 parsed_date = datetime.strptime(clean_str, fmt)
             break
@@ -49,7 +63,6 @@ def universal_date_converter(date_str):
     if parsed_date:
         return parsed_date, parsed_date.strftime("%d-%m-%y")
     
-    # Jika gagal dikenali, kembalikan string aslinya agar tetap tampil
     return datetime.now(), clean_str
 
 def clean_motor_name(raw_text):
@@ -93,27 +106,21 @@ def run_scraper():
                 personil = col_data[3]
                 jadwal_teks = col_data[9]
                 
-                # Filter utama: Harus mengandung "ganti motor" dan BUKAN "dial motor"
                 if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
                     continue
                 
-                # Cek apakah baris ini memiliki status (Done) di kolom jadwal
                 if "(done)" not in jadwal_teks.lower():
                     continue
                 
-                # Ambil potongan teks tanggal yang ada sebelum tulisan (Done)
-                # Contoh: "03 Nov (Done)" -> ambil "03 Nov"
                 parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
                 raw_tgl_str = parts[0].strip()
                 
-                # Ekstrak tanggal terakhir menggunakan konverter universal
                 dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
                 
                 nama_motor = clean_motor_name(raw_job)
                 keterangan = "" 
                 periode = "90"
                 
-                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY secara otomatis
                 next_dt = dt_obj + timedelta(days=90)
                 tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
                 
