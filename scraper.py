@@ -20,15 +20,21 @@ PASSWORD = os.getenv("SCRAPER_PASSWORD")
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 
 def parse_and_format_date(date_str):
-    date_str = date_str.replace('(Done)', '').strip()
-    formats = ["%d %b %Y", "%d %b", "%Y-%m-%d", "%d/%m/%Y"]
+    # Membersihkan teks tanggal dari label status
+    date_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
+    
+    current_year = datetime.now().year
     parsed_date = None
+    
+    # Daftar pola pencocokan tanggal yang fleksibel
+    formats = ["%d %b %Y", "%d %b %y", "%d %b", "%Y-%m-%d", "%d/%m/%Y"]
     
     for fmt in formats:
         try:
             if "%Y" not in fmt and "%y" not in fmt:
-                temp_str = f"{date_str} {datetime.now().year}"
-                parsed_date = datetime.strptime(temp_str, f"{fmt} %Y")
+                # Jika tidak ada tahun dalam string, gabungkan dengan tahun saat ini
+                temp_str = f"{date_str} {current_year}"
+                parsed_date = datetime.strptime(temp_str, "%d %b %Y")
             else:
                 parsed_date = datetime.strptime(date_str, fmt)
             break
@@ -36,8 +42,8 @@ def parse_and_format_date(date_str):
             continue
             
     if parsed_date:
-        return parsed_date.strftime("%d-%m-%y")
-    return date_str
+        return parsed_date, parsed_date.strftime("%d-%m-%y")
+    return None, date_str
 
 def clean_motor_name(raw_text):
     text = re.sub(r'^(ganti\s+motor\s*|cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)', '', raw_text, flags=re.IGNORECASE)
@@ -63,7 +69,7 @@ def run_scraper():
         driver.find_element(By.ID, "id_password").send_keys(PASSWORD)
         driver.find_element(By.XPATH, "//button[@type='submit']").click()
         
-        print(f"3. Mengakses data pencarian strict '{SEARCH_KEYWORD}'...")
+        print(f"3. Mengakses data pencarian '{SEARCH_KEYWORD}'...")
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
@@ -80,34 +86,28 @@ def run_scraper():
                 personil = col_data[3]
                 jadwal_teks = col_data[9]
                 
-                # FILTER KETAT 1: Wajib mengandung kata "ganti motor"
-                if "ganti motor" not in raw_job.lower():
+                # Filter ketat: Harus ada "ganti motor" dan TIDAK boleh ada "dial motor"
+                if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
                     continue
                 
-                # FILTER KETAT 2: Abaikan jika mengandung kata "dial motor"
-                if "dial motor" in raw_job.lower():
-                    continue
-                
-                # Ambil tanggal yang sudah (Done)
-                matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}\s+\(Done\))', jadwal_teks)
+                # Ambil teks tanggal yang berlabel (Done)
+                matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}(?:\s+\d{2,4})?\s*\(Done\))', jadwal_teks)
                 if not matches:
                     continue
                 
-                raw_tgl = matches[0].replace('(Done)', '').strip()
-                tgl_terakhir = parse_and_format_date(raw_tgl)
+                raw_tgl_str = matches[0]
+                dt_obj, tgl_terakhir = parse_and_format_date(raw_tgl_str)
+                
+                if not dt_obj:
+                    continue
                 
                 nama_motor = clean_motor_name(raw_job)
                 keterangan = "" 
                 periode = "90"
                 
-                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY
-                try:
-                    current_year = datetime.now().year
-                    parsed_dt = datetime.strptime(f"{raw_tgl} {current_year}", "%d %b %Y")
-                    next_dt = parsed_dt + timedelta(days=90)
-                    tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
-                except:
-                    tgl_selanjutnya = ""
+                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY secara akurat
+                next_dt = dt_obj + timedelta(days=90)
+                tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
                 
                 row_final = [nama_motor, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
                 processed_data.append(row_final)
