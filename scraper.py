@@ -51,19 +51,14 @@ def run_scraper():
                 cols = row.find_elements(By.TAG_NAME, "td")
                 col_data = [col.text.strip() for col in cols]
                 
-                # Pastikan baris memiliki data tabel yang valid (mengabaikan baris kosong)
                 if len(col_data) > 1:
-                    # Ambil teks nama pekerjaan (biasanya berada di indeks ke-1 setelah kolom 'No')
                     teks_pekerjaan = col_data[1].lower()
                     
-                    # Filter ketat kata kunci "ganti motor"
                     if "ganti motor" in teks_pekerjaan:
-                        # Hilangkan kolom 'No' (indeks 0) agar data masuk ke Sheet mulai dari Nama Pekerjaan
-                         bersih_data = col_data[1:] 
+                        bersih_data = col_data[1:]
                         if bersih_data not in all_filtered_data:
                             all_filtered_data.append(bersih_data)
             
-            # Cek tombol "Selanjutnya" untuk pagination
             try:
                 next_btn = driver.find_element(By.XPATH, "//a[contains(text(), 'Selanjutnya') or contains(text(), 'Next')]")
                 parent_li = next_btn.find_element(By.XPATH, "./ancestor::li")
