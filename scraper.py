@@ -19,19 +19,32 @@ USERNAME = os.getenv("SCRAPER_USERNAME")
 PASSWORD = os.getenv("SCRAPER_PASSWORD")              
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 
-def parse_done_date(jadwal_text):
-    # Mencari tanggal yang berlabel (Done) pada teks jadwal rencana
-    matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}\s+\(Done\))', jadwal_text)
-    if matches:
-        # Mengambil tanggal pertama yang sudah (Done)
-        clean_date = matches[0].replace('(Done)', '').strip()
-        return clean_date
-    return ""
+def parse_and_format_date(date_str):
+    # Membersihkan dan mengubah berbagai format tanggal menjadi DD-MM-YY
+    date_str = date_str.replace('(Done)', '').strip()
+    
+    # Coba berbagai kemungkinan format tanggal yang masuk
+    formats = ["%d %b %Y", "%d %b", "%Y-%m-%d", "%d/%m/%Y"]
+    parsed_date = None
+    
+    for fmt in formats:
+        try:
+            # Jika format tidak memiliki tahun, gunakan tahun saat ini
+            if "%Y" not in fmt and "%y" not in fmt:
+                temp_str = f"{date_str} {datetime.now().year}"
+                parsed_date = datetime.strptime(temp_str, f"{fmt} %Y")
+            else:
+                parsed_date = datetime.strptime(date_str, fmt)
+            break
+        except:
+            continue
+            
+    if parsed_date:
+        return parsed_date.strftime("%d-%m-%y")
+    return date_str
 
 def clean_motor_name(raw_text):
-    # Mengubah "Ganti Motor Waste Conveyor 5..." menjadi "Motor Waste Conveyor 5..."
-    text = re.sub(r'^(ganti\s+motor\s*|cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)', '', raw_text, flags=re.IGNORECASE)
-    # Membuang catatan tambahan di belakang seperti "& Trial", ", kasar", dll
+    text = re.sub(r'^(ganti\s+motor\s*)', '', raw_text, flags=re.IGNORECASE)
     text = re.split(r'(&|,|\bTrial\b)', text)[0].strip()
     return text if text else raw_text
 
@@ -69,35 +82,40 @@ def run_scraper():
             if len(col_data) > 8:
                 raw_job = col_data[1]
                 personil = col_data[3]
-                jadwal_teks = col_data[9] # Kolom I (Jadwal Rencana)
+                jadwal_teks = col_data[9]
                 
-                # Hanya ambil data yang memiliki status (Done)
-                tgl_terakhir = parse_done_date(jadwal_teks)
-                if not tgl_terakhir:
-                    continue # Lewati jika belum (Done)
+                # ABAIKAN jika mengandung kata "dial motor"
+                if "dial motor" in raw_job.lower():
+                    continue
+                
+                # Ambil tanggal yang sudah (Done)
+                matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}\s+\(Done\))', jadwal_teks)
+                if not matches:
+                    continue
+                
+                raw_tgl = matches[0].replace('(Done)', '').strip()
+                tgl_terakhir = parse_and_format_date(raw_tgl)
                 
                 nama_motor = clean_motor_name(raw_job)
-                keterangan = "" # Dikosongkan sesuai permintaan
-                periode = "90"    # Default 90 hari
+                keterangan = "" 
+                periode = "90"
                 
-                # Hitung tanggal berkala selanjutnya (+90 hari)
+                # Hitung Tanggal Berkala Selanjutnya (+90 hari) dan format DD-MM-YY
                 try:
-                    # Parse tanggal format misal "03 Nov"
                     current_year = datetime.now().year
-                    parsed_date = datetime.strptime(f"{tgl_terakhir} {current_year}", "%d %b %Y")
-                    next_date_obj = parsed_date + timedelta(days=90)
-                    tgl_selanjutnya = next_date_obj.strftime("%d %b %Y")
+                    parsed_dt = datetime.strptime(f"{raw_tgl} {current_year}", "%d %b %Y")
+                    next_dt = parsed_dt + timedelta(days=90)
+                    tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
                 except:
                     tgl_selanjutnya = ""
                 
-                # Susun urutan kolom: [Nama Motor, Tanggal Terakhir, Personil, Keterangan, Periode, Tanggal Selanjutnya]
                 row_final = [nama_motor, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
                 processed_data.append(row_final)
                 
-        print(f"-> Total data valid (Done) terkumpul: {len(processed_data)} baris.")
+        print(f"-> Total data valid terkumpul: {len(processed_data)} baris.")
         
         if processed_data:
-            print("5. Mengirim data rapi ke Google Sheets...")
+            print("5. Mengirim data bersih ke Google Sheets...")
             response = requests.post(APPS_SCRIPT_URL, json=processed_data)
             print("Respon server Google Sheets:", response.text)
 
