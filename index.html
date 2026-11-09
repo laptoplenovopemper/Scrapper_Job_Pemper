@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Lowongan / PMP Job</title>
+    <!-- Menggunakan Tailwind CSS untuk tampilan modern -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans leading-normal tracking-normal">
+
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-blue-600">Daftar Data PMP</h1>
+            <p class="text-gray-500 mt-2">Data dimuat secara real-time langsung dari Google Sheets</p>
+        </header>
+
+        <!-- Indikator Loading -->
+        <div id="loading" class="text-center py-10">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">Sedang memuat data...</p>
+        </div>
+
+        <!-- Tabel Kontainer -->
+        <div id="table-container" class="overflow-x-auto bg-white shadow-md rounded-lg hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead id="table-head" class="bg-blue-600 text-white">
+                    <!-- Header akan diisi secara dinamis oleh JavaScript -->
+                </thead>
+                <tbody id="table-body" class="divide-y divide-gray-200">
+                    <!-- Data baris akan diisi secara dinamis oleh JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pesan Error jika gagal -->
+        <div id="error-msg" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4" role="alert">
+            <strong class="font-bold">Gagal memuat data!</strong>
+            <span class="block sm:inline" id="error-text"></span>
+        </div>
+    </div>
+
+    <script>
+        // URL Web App Apps Script Anda
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+
+        async function fetchData() {
+            const loadingEl = document.getElementById('loading');
+            const tableContainer = document.getElementById('table-container');
+            const tableHead = document.getElementById('table-head');
+            const tableBody = document.getElementById('table-body');
+            const errorMsg = document.getElementById('error-msg');
+            const errorText = document.getElementById('error-text');
+
+            try {
+                const response = await fetch(APPS_SCRIPT_URL);
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                if (!data || data.length === 0) {
+                    loadingEl.innerHTML = "<p class='text-gray-500'>Tidak ada data ditemukan di Spreadsheet.</p>";
+                    return;
+                }
+
+                // Ambil kunci (kolom) dari objek pertama sebagai header tabel
+                const keys = Object.keys(data[0]);
+
+                // Buat Header Tabel HTML
+                let headerRow = '<tr>';
+                keys.forEach(key => {
+                    headerRow += `<th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">${key}</th>`;
+                });
+                headerRow += '</tr>';
+                tableHead.innerHTML = headerRow;
+
+                // Buat Baris Data Tabel HTML
+                let bodyRows = '';
+                data.forEach((row, index) => {
+                    const rowClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                    bodyRows += `<tr class="${rowClass} hover:bg-blue-50 transition">`;
+                    keys.forEach(key => {
+                        let cellValue = row[key] !== undefined ? row[key] : '';
+                        bodyRows += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${cellValue}</td>`;
+                    });
+                    bodyRows += '</tr>';
+                });
+                tableBody.innerHTML = bodyRows;
+
+                // Tampilkan tabel dan sembunyikan loading
+                loadingEl.classList.add('hidden');
+                tableContainer.classList.remove('hidden');
+
+            } catch (error) {
+                loadingEl.classList.add('hidden');
+                errorText.textContent = error.message;
+                errorMsg.classList.remove('hidden');
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        // Panggil fungsi saat halaman selesai dimuat
+        document.addEventListener('DOMContentLoaded', fetchData);
+    </script>
+</body>
+</html>
