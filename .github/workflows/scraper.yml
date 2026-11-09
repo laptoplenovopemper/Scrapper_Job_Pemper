@@ -1,0 +1,31 @@
+name: Run Daily Job Scraper
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Menjalankan otomatis setiap hari pukul 00:00 UTC (bisa disesuaikan)
+  workflow_dispatch: # Memungkinkan Anda menjalankan manual kapan saja lewat tab Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests selenium webdriver-manager
+
+    - name: Run Scraper Script
+      env:
+        SCRAPER_USERNAME: ${{ secrets.SCRAPER_USERNAME }}
+        SCRAPER_PASSWORD: ${{ secrets.SCRAPER_PASSWORD }}
+      run: |
+        python scraper.py
