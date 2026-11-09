@@ -5,60 +5,199 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Pengecekan Berkala Motor - PMP</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* CSS agar Header Tabel tetap menempel di atas saat digulir */
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            background-color: #0d6efd !important;
+            color: white;
+            z-index: 10;
+        }
+    </style>
 </head>
 <body class="bg-light">
-    <div class="container py-5">
-        <div class="text-center mb-4">
-            <h1 class="fw-bold text-primary">Data Pengecekan Berkala Motor</h1>
-            <p class="text-muted">Data dimuat secara real-time langsung dari Google Sheets (Filter: Ganti Motor)</p>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="fw-bold text-primary">Data Pengecekan Berkala Motor</h1>
+                <p class="text-muted mb-0">Kelola dan pantau data penggantian motor secara real-time</p>
+            </div>
+            <button class="btn btn-success" onclick="openAddModal()">+ Tambah Data Baru</button>
         </div>
 
         <div class="card shadow-sm">
-            <div class="card-body">
-                <div id="table-container" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Memuat...</span>
-                    </div>
-                    <p class="text-secondary mt-2">Sedang memuat data dari Google Sheets...</p>
+            <div class="card-body p-0">
+                <div id="table-container" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="text-secondary mt-2">Memuat data...</p>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Modal Form Tambah / Edit -->
+    <div class="modal fade" id="dataModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">Tambah Data Baru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="dataForm">
+                        <input type="hidden" id="rowIndex">
+                        <div class="mb-3">
+                            <label class="form-label">Nama Motor</label>
+                            <input type="text" class="form-control" id="f1" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tanggal Penggantian Berkala Terakhir</label>
+                            <input type="text" class="form-control" id="f2" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Personil</label>
+                            <input type="text" class="form-control" id="f3" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Keterangan</label>
+                            <input type="text" class="form-control" id="f4">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Periode</label>
+                            <input type="text" class="form-control" id="f5">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tanggal Berkala Selanjutnya</label>
+                            <input type="text" class="form-control" id="f6">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Simpan Data</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+        let globalData = [];
+        let modalInstance = new bootstrap.Modal(document.getElementById('dataModal'));
 
-        fetch(APPS_SCRIPT_URL)
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('table-container');
-                if (!data || data.length === 0) {
-                    container.innerHTML = '<p class="text-center text-danger mb-0">Belum ada data yang tersedia.</p>';
-                    return;
-                }
-
-                let html = '<div class="table-responsive"><table class="table table-striped table-bordered align-middle"><thead class="table-primary"><tr>';
-                
-                const headers = ["No", "Nama Pekerjaan", "PIC", "Personil", "Line", "Mesin", "Sub Mesin", "Fokus", "Prioritas", "Jadwal Rencana", "Progres"];
-                headers.forEach(h => html += `<th>${h}</th>`);
-                html += '</tr></thead><tbody>';
-
-                data.forEach((row, index) => {
-                    html += '<tr>';
-                    html += `<td>${index + 1}</td>`;
-                    row.forEach(cell => {
-                        html += `<td>${cell || ''}</td>`;
-                    });
-                    html += '</tr>';
+        function loadData() {
+            fetch(APPS_SCRIPT_URL)
+                .then(res => res.json())
+                .then(data => {
+                    globalData = data;
+                    renderTable(data);
+                })
+                .catch(err => {
+                    document.getElementById('table-container').innerHTML = '<p class="text-danger p-4">Gagal memuat data.</p>';
                 });
+        }
 
-                html += '</tbody></table></div>';
-                container.innerHTML = html;
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('table-container').innerHTML = '<p class="text-center text-danger mb-0">Gagal memuat data. Pastikan Web App URL sudah diset publish "Anyone" (Siapa saja).</p>';
+        function renderTable(data) {
+            const container = document.getElementById('table-container');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p class="text-center text-danger p-4">Belum ada data.</p>';
+                return;
+            }
+
+            let html = '<div class="table-responsive"><table class="table table-striped table-bordered align-middle mb-0"><thead class="table-primary"><tr>';
+            
+            // Header kustom sesuai permintaan
+            const headers = ["No", "Nama Motor", "Tanggal Penggantian Berkala Terakhir", "Personil", "Keterangan", "Periode", "Tanggal Berkala Selanjutnya", "Aksi"];
+            headers.forEach(h => html += `<th>${h}</th>`);
+            html += '</tr></thead><tbody>';
+
+            // Lewati baris pertama jika itu header di spreadsheet
+            let startIndex = 1; 
+            for (let i = startIndex; i < data.length; i++) {
+                let row = data[i];
+                html += '<tr>';
+                html += `<td>${i}</td>`;
+                row.forEach(cell => {
+                    html += `<td>${cell || ''}</td>`;
+                });
+                // Tombol Aksi CRUD (Edit & Hapus)
+                html += `<td>
+                    <button class="btn btn-sm btn-warning me-1" onclick="openEditModal(${i})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteData(${i})">Hapus</button>
+                </td>`;
+                html += '</tr>';
+            }
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').innerText = "Tambah Data Baru";
+            document.getElementById('rowIndex').value = "";
+            document.getElementById('dataForm').reset();
+            modalInstance.show();
+        }
+
+        function openEditModal(index) {
+            document.getElementById('modalTitle').innerText = "Edit Data";
+            document.getElementById('rowIndex').value = index;
+            let row = globalData[index];
+            document.getElementById('f1').value = row[0] || '';
+            document.getElementById('f2').value = row[1] || '';
+            document.getElementById('f3').value = row[2] || '';
+            document.getElementById('f4').value = row[3] || '';
+            document.getElementById('f5').value = row[4] || '';
+            document.getElementById('f6').value = row[5] || '';
+            modalInstance.show();
+        }
+
+        document.getElementById('dataForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            let index = document.getElementById('rowIndex').value;
+            let rowData = [
+                document.getElementById('f1').value,
+                document.getElementById('f2').value,
+                document.getElementById('f3').value,
+                document.getElementById('f4').value,
+                document.getElementById('f5').value,
+                document.getElementById('f6').value
+            ];
+
+            let payload = {
+                action: index === "" ? "add" : "update",
+                index: index === "" ? null : parseInt(index) - 1,
+                data: rowData
+            };
+
+            fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            }).then(() => {
+                modalInstance.hide();
+                loadData();
             });
+        });
+
+        function deleteData(index) {
+            if (confirm("Yakin ingin menghapus data ini?")) {
+                let payload = {
+                    action: "delete",
+                    index: index - 1
+                };
+                fetch(APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                }).then(() => {
+                    loadData();
+                });
+            }
+        }
+
+        loadData();
     </script>
 </body>
 </html>
