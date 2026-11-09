@@ -20,16 +20,12 @@ PASSWORD = os.getenv("SCRAPER_PASSWORD")
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 
 def parse_and_format_date(date_str):
-    # Membersihkan dan mengubah berbagai format tanggal menjadi DD-MM-YY
     date_str = date_str.replace('(Done)', '').strip()
-    
-    # Coba berbagai kemungkinan format tanggal yang masuk
     formats = ["%d %b %Y", "%d %b", "%Y-%m-%d", "%d/%m/%Y"]
     parsed_date = None
     
     for fmt in formats:
         try:
-            # Jika format tidak memiliki tahun, gunakan tahun saat ini
             if "%Y" not in fmt and "%y" not in fmt:
                 temp_str = f"{date_str} {datetime.now().year}"
                 parsed_date = datetime.strptime(temp_str, f"{fmt} %Y")
@@ -44,7 +40,7 @@ def parse_and_format_date(date_str):
     return date_str
 
 def clean_motor_name(raw_text):
-    text = re.sub(r'^(ganti\s+motor\s*)', '', raw_text, flags=re.IGNORECASE)
+    text = re.sub(r'^(ganti\s+motor\s*|cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)', '', raw_text, flags=re.IGNORECASE)
     text = re.split(r'(&|,|\bTrial\b)', text)[0].strip()
     return text if text else raw_text
 
@@ -67,7 +63,7 @@ def run_scraper():
         driver.find_element(By.ID, "id_password").send_keys(PASSWORD)
         driver.find_element(By.XPATH, "//button[@type='submit']").click()
         
-        print(f"3. Mengakses data pencarian '{SEARCH_KEYWORD}'...")
+        print(f"3. Mengakses data pencarian strict '{SEARCH_KEYWORD}'...")
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
@@ -84,7 +80,11 @@ def run_scraper():
                 personil = col_data[3]
                 jadwal_teks = col_data[9]
                 
-                # ABAIKAN jika mengandung kata "dial motor"
+                # FILTER KETAT 1: Wajib mengandung kata "ganti motor"
+                if "ganti motor" not in raw_job.lower():
+                    continue
+                
+                # FILTER KETAT 2: Abaikan jika mengandung kata "dial motor"
                 if "dial motor" in raw_job.lower():
                     continue
                 
@@ -100,7 +100,7 @@ def run_scraper():
                 keterangan = "" 
                 periode = "90"
                 
-                # Hitung Tanggal Berkala Selanjutnya (+90 hari) dan format DD-MM-YY
+                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY
                 try:
                     current_year = datetime.now().year
                     parsed_dt = datetime.strptime(f"{raw_tgl} {current_year}", "%d %b %Y")
