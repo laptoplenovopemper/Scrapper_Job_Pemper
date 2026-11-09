@@ -19,20 +19,20 @@
         .app-header {
             background: linear-gradient(135deg, #0d6efd, #0b5ed7);
             color: white;
-            padding: 1.25rem 2rem;
+            padding: 1rem 2rem;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             flex-shrink: 0;
         }
-        /* Konten utama fleksibel */
+        /* Konten utama memenuhi sisa layar dengan leluasa */
         .app-container {
             flex: 1;
-            padding: 1.5rem;
+            padding: 1.25rem 2rem;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             max-width: 100%;
         }
-        /* Area tabel dengan scroll internal khusus isi data */
+        /* Frame kartu tabel yang luas dan lapang */
         .table-card {
             flex: 1;
             display: flex;
@@ -41,11 +41,19 @@
             border-radius: 8px;
             box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
             overflow: hidden;
+            border: 1px solid rgba(0,0,0,.125);
         }
+        /* Area tabel responsif fit layar, bebas scroll horizontal */
         .table-responsive {
             flex: 1;
-            overflow-y: auto; /* Hanya isi tabel yang bisa digulir */
-            max-height: calc(100vh - 220px);
+            overflow-y: auto;
+            overflow-x: hidden; /* Menghilangkan scroll horizontal */
+            width: 100%;
+        }
+        .table {
+            width: 100%;
+            table-layout: auto;
+            margin-bottom: 0;
         }
         thead th {
             position: sticky;
@@ -55,11 +63,10 @@
             z-index: 10;
             text-align: center;
             vertical-align: middle;
-            white-space: nowrap;
         }
         tbody td {
             vertical-align: middle;
-            white-space: nowrap;
+            word-break: break-word;
         }
     </style>
 </head>
@@ -170,13 +177,13 @@
             for (let i = 1; i < data.length; i++) {
                 let row = data[i];
                 html += '<tr>';
-                html += `<td class="text-center fw-semibold">${i}</td>`;
+                html += `<td class="text-center fw-semibold" style="width: 50px;">${i}</td>`;
                 for (let j = 0; j < 6; j++) {
                     html += `<td>${row[j] || ''}</td>`;
                 }
-                html += `<td class="text-center">
-                    <button class="btn btn-sm btn-warning text-white me-1 px-3" onclick="openEditModal(${i})">Edit</button>
-                    <button class="btn btn-sm btn-danger px-3" onclick="deleteData(${i})">Hapus</button>
+                html += `<td class="text-center" style="width: 160px;">
+                    <button class="btn btn-sm btn-warning text-white me-1 px-2" onclick="openEditModal(${i})">Edit</button>
+                    <button class="btn btn-sm btn-danger px-2" onclick="deleteData(${i})">Hapus</button>
                 </td>`;
                 html += '</tr>';
             }
