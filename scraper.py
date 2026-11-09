@@ -9,11 +9,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# Mengatur rentang waktu otomatis 1 bulan terakhir hingga hari ini
+# Rentang waktu 1 bulan terakhir hingga hari ini
 date_to = datetime.now().strftime("%Y-%m-%d")
 date_from = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
 
-# URL dengan filter tanggal otomatis 1 bulan
 LOGIN_URL = "http://job.pmp.web.id/login/"
 DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}&pic=&line=&mesin=&sub_mesin=&departemen=&bagian=&sub_bagian=&s="
 
@@ -42,69 +41,55 @@ def run_scraper():
         driver.find_element(By.ID, "id_password").send_keys(PASSWORD)
         driver.find_element(By.XPATH, "//button[@type='submit']").click()
         
-        print(f"4. Mengakses data dengan rentang tanggal: {date_from} s.d {date_to}...")
+        print(f"4. Mengakses data rentang tanggal: {date_from} s.d {date_to}...")
         driver.get(DASHBOARD_URL)
         time.sleep(4)
         
-        print("5. Memasukkan kata kunci pencarian 'Ganti Motor'...")
-        try:
-            # Mencari kolom search pada tabel Daily Jobs
-            search_box = wait.until(EC.presence_of_element_located((By.XPATH, "//input[@type='search' or contains(@placeholder, '')]")))
-            # Alternatif: mencari input di dalam area Daily Jobs
-            search_inputs = driver.find_elements(By.TAG_NAME, "input")
-            for inp in search_inputs:
-                if inp.get_attribute("type") == "text" or inp.get_attribute("type") == "search":
-                    inp.clear()
-                    inp.send_keys("Ganti Motor")
-                    break
-            time.sleep(3) # Menunggu hasil pencarian terfilter
-        except Exception as e:
-            print("Peringatan saat mengisi kolom search:", str(e))
-        
-        all_extracted_data = []
+        all_filtered_data = []
         page_count = 1
         
-        # 6. Looping untuk mengambil data dari halaman aktif hingga halaman berikutnya (Pagination)
+        # 5. Perulangan halaman (Pagination) dengan filter ketat "ganti motor"
         while True:
-            print(f"-> Mengambil data dari halaman {page_count}...")
+            print(f"-> Memeriksa halaman {page_count}...")
             rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
             
             for row in rows:
                 cols = row.find_elements(By.TAG_NAME, "td")
                 col_data = [col.text.strip() for col in cols]
-                if col_data and col_data not in all_extracted_data:
-                    all_extracted_data.append(col_data)
+                
+                if col_data:
+                    # Ambil teks pada kolom nama pekerjaan (biasanya indeks ke-1)
+                    teks_pekerjaan = col_data[1].lower() if len(col_data) > 1 else col_data[0].lower()
+                    
+                    # FILTER KETAT: Hanya ambil baris yang mengandung kata "ganti motor"
+                    if "ganti motor" in teks_pekerjaan:
+                        if col_data not in all_filtered_data:
+                            all_filtered_data.append(col_data)
             
-            # Cek apakah tombol "Selanjutnya" (Next) ada dan bisa diklik
+            # Cek tombol "Selanjutnya" untuk halaman berikutnya
             try:
                 next_btn = driver.find_element(By.XPATH, "//a[contains(text(), 'Selanjutnya') or contains(text(), 'Next')]")
-                # Jika tombol disabled atau tidak bisa diklik, hentikan perulangan
                 if "disabled" in next_btn.get_attribute("class") or not next_btn.is_displayed():
                     break
-                
-                # Klik tombol halaman selanjutnya
                 next_btn.click()
                 time.sleep(3)
                 page_count += 1
             except:
-                # Jika tombol selanjutnya sudah tidak ditemukan, berarti sudah di halaman terakhir
                 break
                 
-        print(f"-> Total keseluruhan data terkumpul: {len(all_extracted_data)} baris.")
+        print(f"-> Total data valid dengan filter 'Ganti Motor': {len(all_filtered_data)} baris.")
         
-        if all_extracted_data:
-            print("7. Mengirim data ke Google Sheets...")
-            response = requests.post(APPS_SCRIPT_URL, json=all_extracted_data)
+        if all_filtered_data:
+            print("6. Mengirim data terfilter ke Google Sheets...")
+            response = requests.post(APPS_SCRIPT_URL, json=all_filtered_data)
             print("Respon server Google Sheets:", response.text)
         else:
-            print("Peringatan: Tidak ada data yang ditemukan.")
+            print("Peringatan: Tidak ada data yang cocok dengan kata kunci 'Ganti Motor'.")
 
     except Exception as e:
-        print("\n[TERJADI ERROR PADA SKRIP]:")
-        print(str(e))
+        print("\n[TERJADI ERROR PADA SKRIP]:", str(e))
         
     finally:
-        print("Selesai. Menutup browser...")
         driver.quit()
 
 if __name__ == "__main__":
