@@ -19,7 +19,7 @@
                     <div class="spinner-border text-primary" role="status">
                         <span class="visually-hidden">Memuat...</span>
                     </div>
-                    <p class="text-secondary mt-2">Sedang memuat data dari server...</p>
+                    <p class="text-secondary mt-2">Sedang memuat data dari Google Sheets...</p>
                 </div>
             </div>
         </div>
@@ -39,7 +39,6 @@
 
                 let html = '<div class="table-responsive"><table class="table table-striped table-bordered align-middle"><thead class="table-primary"><tr>';
                 
-                // Header kolom tabel sesuai isi data
                 const headers = ["No", "Nama Pekerjaan", "PIC", "Personil", "Line", "Mesin", "Sub Mesin", "Fokus", "Prioritas", "Jadwal Rencana", "Progres"];
                 headers.forEach(h => html += `<th>${h}</th>`);
                 html += '</tr></thead><tbody>';
@@ -58,7 +57,7 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                document.getElementById('table-container').innerHTML = '<p class="text-center text-danger mb-0">Gagal memuat data. Pastikan koneksi atau Web App URL aktif.</p>';
+                document.getElementById('table-container').innerHTML = '<p class="text-center text-danger mb-0">Gagal memuat data. Pastikan Web App URL sudah diset publish "Anyone" (Siapa saja).</p>';
             });
     </script>
 </body>
