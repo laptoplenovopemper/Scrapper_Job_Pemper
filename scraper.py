@@ -1,5 +1,6 @@
 import os
 import time
+import re
 import requests
 from datetime import datetime, timedelta
 from selenium import webdriver
@@ -17,6 +18,22 @@ DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}
 USERNAME = os.getenv("SCRAPER_USERNAME")                     
 PASSWORD = os.getenv("SCRAPER_PASSWORD")              
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
+
+def parse_done_date(jadwal_text):
+    # Mencari tanggal yang berlabel (Done) pada teks jadwal rencana
+    matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}\s+\(Done\))', jadwal_text)
+    if matches:
+        # Mengambil tanggal pertama yang sudah (Done)
+        clean_date = matches[0].replace('(Done)', '').strip()
+        return clean_date
+    return ""
+
+def clean_motor_name(raw_text):
+    # Mengubah "Ganti Motor Waste Conveyor 5..." menjadi "Motor Waste Conveyor 5..."
+    text = re.sub(r'^(ganti\s+motor\s*|cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)', '', raw_text, flags=re.IGNORECASE)
+    # Membuang catatan tambahan di belakang seperti "& Trial", ", kasar", dll
+    text = re.split(r'(&|,|\bTrial\b)', text)[0].strip()
+    return text if text else raw_text
 
 def run_scraper():
     print("1. Menyiapkan browser Chrome Headless...")
@@ -41,27 +58,47 @@ def run_scraper():
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
-        print("4. Mengambil data baris tabel...")
+        print("4. Memproses dan memfilter baris data...")
         rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
         
-        extracted_data = []
+        processed_data = []
         for row in rows:
             cols = row.find_elements(By.TAG_NAME, "td")
             col_data = [col.text.strip() for col in cols]
             
-            if len(col_data) > 1:
-                # CEK & SKIP: Jangan masukkan baris jika itu adalah teks header bawaan website
-                if "nama pekerjaan" in col_data[1].lower():
-                    continue
+            if len(col_data) > 8:
+                raw_job = col_data[1]
+                personil = col_data[3]
+                jadwal_teks = col_data[9] # Kolom I (Jadwal Rencana)
                 
-                bersih_data = col_data[1:] # Membuang nomor urut tabel web
-                extracted_data.append(bersih_data)
+                # Hanya ambil data yang memiliki status (Done)
+                tgl_terakhir = parse_done_date(jadwal_teks)
+                if not tgl_terakhir:
+                    continue # Lewati jika belum (Done)
                 
-        print(f"-> Total data bersih: {len(extracted_data)} baris.")
+                nama_motor = clean_motor_name(raw_job)
+                keterangan = "" # Dikosongkan sesuai permintaan
+                periode = "90"    # Default 90 hari
+                
+                # Hitung tanggal berkala selanjutnya (+90 hari)
+                try:
+                    # Parse tanggal format misal "03 Nov"
+                    current_year = datetime.now().year
+                    parsed_date = datetime.strptime(f"{tgl_terakhir} {current_year}", "%d %b %Y")
+                    next_date_obj = parsed_date + timedelta(days=90)
+                    tgl_selanjutnya = next_date_obj.strftime("%d %b %Y")
+                except:
+                    tgl_selanjutnya = ""
+                
+                # Susun urutan kolom: [Nama Motor, Tanggal Terakhir, Personil, Keterangan, Periode, Tanggal Selanjutnya]
+                row_final = [nama_motor, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
+                processed_data.append(row_final)
+                
+        print(f"-> Total data valid (Done) terkumpul: {len(processed_data)} baris.")
         
-        if extracted_data:
-            print("5. Mengirim data ke Google Sheets...")
-            response = requests.post(APPS_SCRIPT_URL, json=extracted_data)
+        if processed_data:
+            print("5. Mengirim data rapi ke Google Sheets...")
+            response = requests.post(APPS_SCRIPT_URL, json=processed_data)
             print("Respon server Google Sheets:", response.text)
 
     except Exception as e:
