@@ -20,19 +20,16 @@ PASSWORD = os.getenv("SCRAPER_PASSWORD")
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 
 def parse_and_format_date(date_str):
-    # Membersihkan teks tanggal dari label status
+    # Membersihkan label status
     date_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
-    
     current_year = datetime.now().year
     parsed_date = None
     
-    # Daftar pola pencocokan tanggal yang fleksibel
     formats = ["%d %b %Y", "%d %b %y", "%d %b", "%Y-%m-%d", "%d/%m/%Y"]
     
     for fmt in formats:
         try:
             if "%Y" not in fmt and "%y" not in fmt:
-                # Jika tidak ada tahun dalam string, gabungkan dengan tahun saat ini
                 temp_str = f"{date_str} {current_year}"
                 parsed_date = datetime.strptime(temp_str, "%d %b %Y")
             else:
@@ -90,12 +87,12 @@ def run_scraper():
                 if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
                     continue
                 
-                # Ambil teks tanggal yang berlabel (Done)
-                matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}(?:\s+\d{2,4})?\s*\(Done\))', jadwal_teks)
+                # PERBAIKAN: Regex lebih fleksibel menangkap tanggal dengan format pendek (misal: "30 Okt (Done)")
+                matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}(?:\s+\d{2,4})?)\s*\(Done\)', jadwal_teks)
                 if not matches:
                     continue
                 
-                raw_tgl_str = matches[0]
+                raw_tgl_str = matches[0].strip()
                 dt_obj, tgl_terakhir = parse_and_format_date(raw_tgl_str)
                 
                 if not dt_obj:
@@ -105,7 +102,7 @@ def run_scraper():
                 keterangan = "" 
                 periode = "90"
                 
-                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY secara akurat
+                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY
                 next_dt = dt_obj + timedelta(days=90)
                 tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
                 
