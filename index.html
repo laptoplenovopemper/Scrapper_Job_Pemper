@@ -4,11 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Pengecekan Berkala Motor - PMP</title>
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* CSS agar Header Tabel tetap menempel di atas saat digulir */
+        body {
+            background-color: #f8f9fa;
+        }
+        /* Sticky Header agar tabel tetap rapi saat digulir */
         .table-responsive {
-            max-height: 600px;
+            max-height: 650px;
             overflow-y: auto;
         }
         thead th {
@@ -17,24 +21,37 @@
             background-color: #0d6efd !important;
             color: white;
             z-index: 10;
+            text-align: center;
+            vertical-align: middle;
+        }
+        tbody td {
+            vertical-align: middle;
         }
     </style>
 </head>
-<body class="bg-light">
-    <div class="container py-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h1 class="fw-bold text-primary">Data Pengecekan Berkala Motor</h1>
-                <p class="text-muted mb-0">Kelola dan pantau data penggantian motor secara real-time</p>
+<body>
+    <div class="container py-5">
+        <!-- Header Judul -->
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-8">
+                <h2 class="fw-bold text-primary mb-1">Data Pengecekan Berkala Motor</h2>
+                <p class="text-muted mb-0">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
             </div>
-            <button class="btn btn-success" onclick="openAddModal()">+ Tambah Data Baru</button>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <button class="btn btn-success shadow-sm" onclick="openAddModal()">
+                    <i class="bi bi-plus-lg"></i> + Tambah Data Baru
+                </button>
+            </div>
         </div>
 
-        <div class="card shadow-sm">
+        <!-- Tabel Data -->
+        <div class="card shadow-sm border-0">
             <div class="card-body p-0">
                 <div id="table-container" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="text-secondary mt-2">Memuat data...</p>
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Memuat...</span>
+                    </div>
+                    <p class="text-secondary mt-2">Sedang menyinkronkan data...</p>
                 </div>
             </div>
         </div>
@@ -44,44 +61,45 @@
     <div class="modal fade" id="dataModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title" id="modalTitle">Tambah Data Baru</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="dataForm">
                         <input type="hidden" id="rowIndex">
                         <div class="mb-3">
-                            <label class="form-label">Nama Motor</label>
-                            <input type="text" class="form-control" id="f1" required>
+                            <label class="form-label fw-semibold">Nama Motor</label>
+                            <input type="text" class="form-control" id="fNama" required placeholder="Contoh: Motor Waste Conveyor 5">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Tanggal Penggantian Berkala Terakhir</label>
-                            <input type="text" class="form-control" id="f2" required>
+                            <label class="form-label fw-semibold">Tanggal Penggantian Terakhir</label>
+                            <input type="text" class="form-control" id="fTglTerakhir" required placeholder="Contoh: 03 Nov">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Personil</label>
-                            <input type="text" class="form-control" id="f3" required>
+                            <label class="form-label fw-semibold">Personil</label>
+                            <input type="text" class="form-control" id="fPersonil" required placeholder="Nama personil">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Keterangan</label>
-                            <input type="text" class="form-control" id="f4">
+                            <label class="form-label fw-semibold">Keterangan</label>
+                            <input type="text" class="form-control" id="fKeterangan" placeholder="Kosongkan jika tidak ada">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Periode</label>
-                            <input type="text" class="form-control" id="f5">
+                            <label class="form-label fw-semibold">Periode (Hari)</label>
+                            <input type="number" class="form-control" id="fPeriode" value="90" required oninput="hitungTanggalSelanjutnya()">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Tanggal Berkala Selanjutnya</label>
-                            <input type="text" class="form-control" id="f6">
+                            <label class="form-label fw-semibold">Tanggal Berkala Selanjutnya</label>
+                            <input type="text" class="form-control bg-light" id="fTglSelanjutnya" readonly placeholder="Dihitung otomatis">
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">Simpan Data</button>
+                        <button type="submit" class="btn btn-primary w-100 py-2">Simpan Perubahan</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
@@ -96,37 +114,38 @@
                     renderTable(data);
                 })
                 .catch(err => {
-                    document.getElementById('table-container').innerHTML = '<p class="text-danger p-4">Gagal memuat data.</p>';
+                    console.error(err);
+                    document.getElementById('table-container').innerHTML = '<p class="text-danger p-4">Gagal memuat data dari server.</p>';
                 });
         }
 
         function renderTable(data) {
             const container = document.getElementById('table-container');
-            if (!data || data.length === 0) {
-                container.innerHTML = '<p class="text-center text-danger p-4">Belum ada data.</p>';
+            if (!data || data.length <= 1) {
+                container.innerHTML = '<p class="text-center text-secondary p-5">Belum ada data penggantian motor yang berstatus (Done).</p>';
                 return;
             }
 
-            let html = '<div class="table-responsive"><table class="table table-striped table-bordered align-middle mb-0"><thead class="table-primary"><tr>';
+            let html = '<div class="table-responsive"><table class="table table-striped table-hover align-middle mb-0"><thead class="table-primary"><tr>';
             
-            // Header kustom sesuai permintaan
+            // Header Tabel Sesuai Permintaan
             const headers = ["No", "Nama Motor", "Tanggal Penggantian Berkala Terakhir", "Personil", "Keterangan", "Periode", "Tanggal Berkala Selanjutnya", "Aksi"];
             headers.forEach(h => html += `<th>${h}</th>`);
             html += '</tr></thead><tbody>';
 
-            // Lewati baris pertama jika itu header di spreadsheet
-            let startIndex = 1; 
-            for (let i = startIndex; i < data.length; i++) {
+            // Lewati baris pertama (index 0) karena merupakan header di spreadsheet
+            for (let i = 1; i < data.length; i++) {
                 let row = data[i];
                 html += '<tr>';
-                html += `<td>${i}</td>`;
-                row.forEach(cell => {
-                    html += `<td>${cell || ''}</td>`;
-                });
+                html += `<td class="text-center fw-semibold">${i}</td>`;
+                // Menampilkan 6 kolom data utama
+                for (let j = 0; j < 6; j++) {
+                    html += `<td>${row[j] || ''}</td>`;
+                }
                 // Tombol Aksi CRUD (Edit & Hapus)
-                html += `<td>
-                    <button class="btn btn-sm btn-warning me-1" onclick="openEditModal(${i})">Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteData(${i})">Hapus</button>
+                html += `<td class="text-center">
+                    <button class="btn btn-sm btn-warning text-white me-1 px-3" onclick="openEditModal(${i})">Edit</button>
+                    <button class="btn btn-sm btn-danger px-3" onclick="deleteData(${i})">Hapus</button>
                 </td>`;
                 html += '</tr>';
             }
@@ -136,35 +155,62 @@
         }
 
         function openAddModal() {
-            document.getElementById('modalTitle').innerText = "Tambah Data Baru";
+            document.getElementById('modalTitleinnerText').innerText = "Tambah Data Baru";
             document.getElementById('rowIndex').value = "";
-            document.getElementById('dataForm').reset();
+            document.getElementById('fNama').value = "";
+            document.getElementById('fTglTerakhir').value = "";
+            document.getElementById('fPersonil').value = "";
+            document.getElementById('fKeterangan').value = "";
+            document.getElementById('fPeriode').value = "90";
+            document.getElementById('fTglSelanjutnya').value = "";
             modalInstance.show();
         }
 
         function openEditModal(index) {
-            document.getElementById('modalTitle').innerText = "Edit Data";
+            document.getElementById('modalTitle').innerText = "Edit Data Pengecekan";
             document.getElementById('rowIndex').value = index;
             let row = globalData[index];
-            document.getElementById('f1').value = row[0] || '';
-            document.getElementById('f2').value = row[1] || '';
-            document.getElementById('f3').value = row[2] || '';
-            document.getElementById('f4').value = row[3] || '';
-            document.getElementById('f5').value = row[4] || '';
-            document.getElementById('f6').value = row[5] || '';
+            document.getElementById('fNama').value = row[0] || '';
+            document.getElementById('fTglTerakhir').value = row[1] || '';
+            document.getElementById('fPersonil').value = row[2] || '';
+            document.getElementById('fKeterangan').value = row[3] || '';
+            document.getElementById('fPeriode').value = row[4] || '90';
+            document.getElementById('fTglSelanjutnya').value = row[5] || '';
             modalInstance.show();
         }
+
+        // Fitur cerdas menghitung otomatis Tanggal Selanjutnya (Tanggal Terakhir + Periode Hari)
+        function hitungTanggalSelanjutnya() {
+            let tglStr = document.getElementById('fTglTerakhir').value.trim();
+            let periodeDays = parseInt(document.getElementById('fPeriode').value) || 90;
+            
+            if (tglStr) {
+                try {
+                    let currentYear = new Date().getFullYear();
+                    let parsedDate = new Date(`${tglStr} ${currentYear}`);
+                    if (!isNaN(parsedDate)) {
+                        parsedDate.setDate(parsedDate.getDate() + periodeDays);
+                        let options = { day: 'numeric', month: 'short' };
+                        document.getElementById('fTglSelanjutnya').value = parsedDate.toLocaleDateString('en-GB', options);
+                    }
+                } catch(e) {
+                    console.log("Format tanggal belum lengkap");
+                }
+            }
+        }
+
+        document.getElementById('fTglTerakhir').addEventListener('input', hitungTanggalSelanjutnya);
 
         document.getElementById('dataForm').addEventListener('submit', function(e) {
             e.preventDefault();
             let index = document.getElementById('rowIndex').value;
             let rowData = [
-                document.getElementById('f1').value,
-                document.getElementById('f2').value,
-                document.getElementById('f3').value,
-                document.getElementById('f4').value,
-                document.getElementById('f5').value,
-                document.getElementById('f6').value
+                document.getElementById('fNama').value,
+                document.getElementById('fTglTerakhir').value,
+                document.getElementById('fPersonil').value,
+                document.getElementById('fKeterangan').value,
+                document.getElementById('fPeriode').value,
+                document.getElementById('fTglSelanjutnya').value
             ];
 
             let payload = {
