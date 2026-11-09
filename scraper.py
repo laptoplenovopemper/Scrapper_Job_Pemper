@@ -20,14 +20,9 @@ PASSWORD = os.getenv("SCRAPER_PASSWORD")
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 
 def universal_date_converter(date_str):
-    """
-    Konverter universal dengan penerjemah bulan bahasa Indonesia ke Inggris
-    agar sukses berjalan di server GitHub Actions (Linux).
-    """
     clean_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
     current_year = datetime.now().year
     
-    # Kamus mapping bulan Indonesia ke Inggris agar terbaca oleh server
     bulan_indo = {
         'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 
         'mei': 'May', 'jun': 'Jun', 'jul': 'Jul', 'agu': 'Aug', 
@@ -37,7 +32,6 @@ def universal_date_converter(date_str):
         'september': 'September', 'oktober': 'October', 'november': 'November', 'desember': 'December'
     }
     
-    # Terjemahkan teks bulan jika ada yang menggunakan bahasa Indonesia
     lower_str = clean_str.lower()
     for id_m, en_m in bulan_indo.items():
         if id_m in lower_str:
@@ -103,6 +97,7 @@ def run_scraper():
             
             if len(col_data) > 8:
                 raw_job = col_data[1]
+                nama_mesin = col_data[5] # Kolom Mesin dari sistem web
                 personil = col_data[3]
                 jadwal_teks = col_data[9]
                 
@@ -124,7 +119,8 @@ def run_scraper():
                 next_dt = dt_obj + timedelta(days=90)
                 tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
                 
-                row_final = [nama_motor, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
+                # Susunan kolom baru: [Nama Motor, Nama Mesin, Tanggal Terakhir, Personil, Keterangan, Periode, Tanggal Selanjutnya]
+                row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
                 processed_data.append(row_final)
                 
         print(f"-> Total data valid terkumpul: {len(processed_data)} baris.")
