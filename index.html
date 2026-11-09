@@ -13,9 +13,8 @@
             background-color: #f8f9fa;
             display: flex;
             flex-direction: column;
-            overflow: hidden; /* Mencegah double scroll pada halaman utama */
+            overflow: hidden;
         }
-        /* Header full-width membentang dari ujung ke ujung */
         .app-header {
             background: linear-gradient(135deg, #0d6efd, #0b5ed7);
             color: white;
@@ -23,7 +22,6 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             flex-shrink: 0;
         }
-        /* Konten utama memenuhi sisa layar dengan leluasa */
         .app-container {
             flex: 1;
             padding: 1.25rem 2rem;
@@ -32,7 +30,6 @@
             overflow: hidden;
             max-width: 100%;
         }
-        /* Frame kartu tabel yang luas dan lapang */
         .table-card {
             flex: 1;
             display: flex;
@@ -43,11 +40,10 @@
             overflow: hidden;
             border: 1px solid rgba(0,0,0,.125);
         }
-        /* Area tabel responsif fit layar, bebas scroll horizontal */
         .table-responsive {
             flex: 1;
             overflow-y: auto;
-            overflow-x: hidden; /* Menghilangkan scroll horizontal */
+            overflow-x: hidden;
             width: 100%;
         }
         .table {
@@ -72,7 +68,6 @@
 </head>
 <body>
 
-    <!-- Header Membentang Penuh Ujung ke Ujung -->
     <header class="app-header">
         <div class="container-fluid d-flex flex-column flex-md-row justify-content-between align-items-center">
             <div>
@@ -87,7 +82,6 @@
         </div>
     </header>
 
-    <!-- Konten Utama Web App -->
     <div class="app-container container-fluid">
         <div class="table-card">
             <div id="table-container" class="h-100 d-flex flex-column justify-content-center align-items-center p-4">
@@ -115,8 +109,12 @@
                             <input type="text" class="form-control" id="fNama" required placeholder="Contoh: Motor Waste Conveyor 5">
                         </div>
                         <div class="mb-3">
+                            <label class="form-label fw-semibold">Nama Mesin</label>
+                            <input type="text" class="form-control" id="fMesin" required placeholder="Contoh: FS 1 / Stacking">
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label fw-semibold">Tanggal Penggantian Terakhir (DD-MM-YY)</label>
-                            <input type="text" class="form-control" id="fTglTerakhir" required placeholder="Contoh: 02-11-26">
+                            <input type="text" class="form-control" id="fTglTerakhir" required placeholder="Contoh: 03-11-26">
                         </div>
                         <div class="mb-3">
                             <label class="form-label fw-semibold">Personil</label>
@@ -170,7 +168,7 @@
 
             let html = '<div class="table-responsive w-100"><table class="table table-striped table-hover align-middle mb-0"><thead class="table-primary"><tr>';
             
-            const headers = ["No", "Nama Motor", "Tanggal Penggantian Berkala Terakhir", "Personil", "Keterangan", "Periode", "Tanggal Berkala Selanjutnya", "Aksi"];
+            const headers = ["No", "Nama Motor", "Nama Mesin", "Tanggal Penggantian Berkala Terakhir", "Personil", "Keterangan", "Periode", "Tanggal Berkala Selanjutnya", "Aksi"];
             headers.forEach(h => html += `<th>${h}</th>`);
             html += '</tr></thead><tbody>';
 
@@ -178,7 +176,7 @@
                 let row = data[i];
                 html += '<tr>';
                 html += `<td class="text-center fw-semibold" style="width: 50px;">${i}</td>`;
-                for (let j = 0; j < 6; j++) {
+                for (let j = 0; j < 7; j++) { // 7 kolom data
                     html += `<td>${row[j] || ''}</td>`;
                 }
                 html += `<td class="text-center" style="width: 160px;">
@@ -205,11 +203,12 @@
             document.getElementById('rowIndex').value = index;
             let row = globalData[index];
             document.getElementById('fNama').value = row[0] || '';
-            document.getElementById('fTglTerakhir').value = row[1] || '';
-            document.getElementById('fPersonil').value = row[2] || '';
-            document.getElementById('fKeterangan').value = row[3] || '';
-            document.getElementById('fPeriode').value = row[4] || '90';
-            document.getElementById('fTglSelanjutnya').value = row[5] || '';
+            document.getElementById('fMesin').value = row[1] || '';
+            document.getElementById('fTglTerakhir').value = row[2] || '';
+            document.getElementById('fPersonil').value = row[3] || '';
+            document.getElementById('fKeterangan').value = row[4] || '';
+            document.getElementById('fPeriode').value = row[5] || '90';
+            document.getElementById('fTglSelanjutnya').value = row[6] || '';
             modalInstance.show();
         }
 
@@ -247,6 +246,7 @@
             let index = document.getElementById('rowIndex').value;
             let rowData = [
                 document.getElementById('fNama').value,
+                document.getElementById('fMesin').value,
                 document.getElementById('fTglTerakhir').value,
                 document.getElementById('fPersonil').value,
                 document.getElementById('fKeterangan').value,
