@@ -19,28 +19,38 @@ USERNAME = os.getenv("SCRAPER_USERNAME")
 PASSWORD = os.getenv("SCRAPER_PASSWORD")              
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 
-def parse_and_format_date(date_str):
-    # Membersihkan label status
-    date_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
+def universal_date_converter(date_str):
+    """
+    Fungsi konverter universal: Menerima segala jenis format tanggal mentah,
+    lalu menyeragamkannya menjadi format DD-MM-YY secara konsisten.
+    """
+    # Bersihkan dari teks status
+    clean_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
     current_year = datetime.now().year
+    
+    # Daftar berbagai variasi format tanggal yang mungkin muncul dari web
+    formats = [
+        "%d %b %Y", "%d %b %y", "%d %B %Y", "%d %B", "%d %b", 
+        "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d-%m-%y"
+    ]
+    
     parsed_date = None
-    
-    formats = ["%d %b %Y", "%d %b %y", "%d %b", "%Y-%m-%d", "%d/%m/%Y"]
-    
     for fmt in formats:
         try:
             if "%Y" not in fmt and "%y" not in fmt:
-                temp_str = f"{date_str} {current_year}"
-                parsed_date = datetime.strptime(temp_str, "%d %b %Y")
+                # Jika format tidak memiliki tahun, pasangkan dengan tahun aktif
+                parsed_date = datetime.strptime(f"{clean_str} {current_year}", f"{fmt} %Y")
             else:
-                parsed_date = datetime.strptime(date_str, fmt)
+                parsed_date = datetime.strptime(clean_str, fmt)
             break
         except:
             continue
             
     if parsed_date:
         return parsed_date, parsed_date.strftime("%d-%m-%y")
-    return None, date_str
+    
+    # Jika gagal dikenali, kembalikan string aslinya agar tetap tampil
+    return datetime.now(), clean_str
 
 def clean_motor_name(raw_text):
     text = re.sub(r'^(ganti\s+motor\s*|cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)', '', raw_text, flags=re.IGNORECASE)
@@ -70,7 +80,7 @@ def run_scraper():
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
-        print("4. Memproses dan memfilter baris data...")
+        print("4. Mengambil dan memproses seluruh baris data...")
         rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
         
         processed_data = []
@@ -83,26 +93,27 @@ def run_scraper():
                 personil = col_data[3]
                 jadwal_teks = col_data[9]
                 
-                # Filter ketat: Harus ada "ganti motor" dan TIDAK boleh ada "dial motor"
+                # Filter utama: Harus mengandung "ganti motor" dan BUKAN "dial motor"
                 if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
                     continue
                 
-                # PERBAIKAN: Regex lebih fleksibel menangkap tanggal dengan format pendek (misal: "30 Okt (Done)")
-                matches = re.findall(r'(\d{1,2}\s+[A-Za-z]{3}(?:\s+\d{2,4})?)\s*\(Done\)', jadwal_teks)
-                if not matches:
+                # Cek apakah baris ini memiliki status (Done) di kolom jadwal
+                if "(done)" not in jadwal_teks.lower():
                     continue
                 
-                raw_tgl_str = matches[0].strip()
-                dt_obj, tgl_terakhir = parse_and_format_date(raw_tgl_str)
+                # Ambil potongan teks tanggal yang ada sebelum tulisan (Done)
+                # Contoh: "03 Nov (Done)" -> ambil "03 Nov"
+                parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
+                raw_tgl_str = parts[0].strip()
                 
-                if not dt_obj:
-                    continue
+                # Ekstrak tanggal terakhir menggunakan konverter universal
+                dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
                 
                 nama_motor = clean_motor_name(raw_job)
                 keterangan = "" 
                 periode = "90"
                 
-                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY
+                # Hitung Tanggal Berkala Selanjutnya (+90 hari) format DD-MM-YY secara otomatis
                 next_dt = dt_obj + timedelta(days=90)
                 tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
                 
@@ -112,7 +123,7 @@ def run_scraper():
         print(f"-> Total data valid terkumpul: {len(processed_data)} baris.")
         
         if processed_data:
-            print("5. Mengirim data bersih ke Google Sheets...")
+            print("5. Mengirim seluruh data ke Google Sheets...")
             response = requests.post(APPS_SCRIPT_URL, json=processed_data)
             print("Respon server Google Sheets:", response.text)
 
