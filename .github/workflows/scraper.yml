@@ -12,7 +12,7 @@ on:
         required: true
         type: string
   schedule:
-    - cron: '0 0 * * *' # Tetap berjalan otomatis setiap hari jika diperlukan
+    - cron: '0 0 * * *'
 
 jobs:
   run-scraper:
@@ -41,7 +41,7 @@ jobs:
 
       - name: Upload Screenshot Artifact
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: debug-screenshot
           path: debug_error.png
