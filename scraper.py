@@ -1,14 +1,9 @@
 import os
 from datetime import datetime, timedelta
+import requests
+from bs4 import BeautifulSoup
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # 1. Menangkap Parameter Tanggal dari Web App
 date_from_input = os.environ.get("INPUT_DATE_FROM", "").strip()
@@ -25,50 +20,48 @@ else:
 
 def run_scraper():
     scraped_data = []
-    print("Membuka browser headless...")
+    print("Memulai proses scraping kilat dengan Requests...")
     
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+    # Header agar dianggap seperti browser asli
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    # Asumsi total halaman mencapai 32 halaman (bisa disesuaikan atau di-looping otomatis)
+    total_pages = 32 
     
     try:
-        target_url = f"https://job.pmp.web.id/?date_from={START_DATE}&date_to={END_DATE}"
-        print(f"Mengakses URL Target: {target_url}")
-        driver.get(target_url)
-        
-        # 2. GUNAKAN EXPLICIT WAIT YANG KUAT (Menunggu tabel benar-benar muncul di DOM)
-        wait = WebDriverWait(driver, 20)
-        
-        # Coba tunggu sampai elemen baris tabel pertama muncul (maksimal 20 detik)
-        try:
-            wait.until(EC.presence_of_element_located((By.XPATH, "//table//tbody/tr")))
-            print("Tabel berhasil dimuat oleh browser!")
-        except Exception as e:
-            print("Peringatan: Tabel tidak kunjung muncul atau kosong pada rentang tanggal ini.")
-            driver.save_screenshot("debug_error.png") # Menyimpan screenshot untuk dianalisis jika gagal
+        for page in range(1, total_pages + 1):
+            target_url = f"https://job.pmp.web.id/?date_from={START_DATE}&date_to={END_DATE}&daily_page={page}"
+            print(f"Mengambil data halaman {page} dari {total_pages}...")
             
-        # 3. CONTOH EKSTRAKSI DATA DARI TABEL
-        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
-        print(f"Ditemukan {len(rows)} baris pada halaman ini.")
-        
-        for row in rows:
-            cols = row.find_elements(By.TAG_NAME, "td")
-            cols_text = [col.text.strip() for col in cols]
-            # Pastikan baris valid dan bukan baris 'Tidak ada data'
-            if cols_text and len(cols_text) > 1 and "Tidak ada" not in cols_text[0]:
-                scraped_data.append(cols_text)
+            response = requests.get(target_url, headers=headers, timeout=10)
+            if response.status_code != 200:
+                print(f"Gagal mengakses halaman {page}, status code: {response.status_code}")
+                break
                 
-        print(f"Total data terkumpul sementara: {len(scraped_data)}")
-        driver.quit()
+            soup = BeautifulSoup(response.text, 'html.parser')
+            rows = soup.select("table tbody tr")
+            
+            if not rows:
+                print(f"Halaman {page} kosong atau habis.")
+                break
+                
+            page_data_count = 0
+            for row in rows:
+                cols = row.find_all('td')
+                cols_text = [col.text.strip() for col in cols]
+                if cols_text and len(cols_text) > 1 and "Tidak ada" not in cols_text[0]:
+                    scraped_data.append(cols_text)
+                    page_data_count += 1
+            
+            print(f"Berhasil menarik {page_data_count} baris dari halaman {page}.")
+            
+        print(f"Total keseluruhan data terkumpul: {len(scraped_data)} baris.")
         return scraped_data
 
     except Exception as e:
-        print(f"Terjadi kesalahan fatal saat scraping: {str(e)}")
-        driver.save_screenshot("debug_tampilan.png")
-        driver.quit()
+        print(f"Terjadi kesalahan saat scraping: {str(e)}")
         return []
 
 def save_to_google_sheets(data):
@@ -77,7 +70,7 @@ def save_to_google_sheets(data):
         return
 
     print("Menyimpan data ke Google Sheets...")
-    # Masukkan logika gspread Anda di sini jika sudah siap
+    # Logika gspread / penyimpanan ke Google Sheets Anda di sini
     print("Selesai!")
 
 if __name__ == "__main__":
