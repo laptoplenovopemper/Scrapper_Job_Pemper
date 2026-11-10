@@ -24,6 +24,7 @@ else:
 
 LOGIN_URL = "http://job.pmp.web.id/login/" 
 SEARCH_KEYWORD = "Ganti Motor"
+# URL langsung membawa hasil filter tanggal & kata kunci secara akurat
 DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}&pic=&line=&mesin=&sub_mesin=&departemen=&bagian=&sub_bagian=&search={SEARCH_KEYWORD.replace(' ', '+')}"
 
 # Ambil Username & Password secara aman dari GitHub Secrets
@@ -96,74 +97,48 @@ def run_scraper():
         driver.find_element(By.XPATH, "//button[@type='submit']").click()
         time.sleep(5)
         
-        print(f"3. Mengakses URL Dashboard: {DASHBOARD_URL}")
+        print(f"3. Mengakses URL Dashboard Filter: {DASHBOARD_URL}")
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
-        print("4. Mengambil dan memproses seluruh baris data dari semua halaman...")
-        processed_data = []
-        page_num = 1
+        print("4. Mengambil dan memproses seluruh baris data hasil filter...")
+        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
+        print(f"   Ditemukan total {len(rows)} baris pada tabel.")
         
-        # Looping otomatis antar halaman (Pagination) sampai habis
-        while True:
-            print(f"-> Memproses halaman {page_num}...")
-            time.sleep(2)
+        processed_data = []
+        for row in rows:
+            cols = row.find_elements(By.TAG_NAME, "td")
+            col_data = [col.text.strip() for col in cols]
             
-            rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
-            print(f"   Ditemukan {len(rows)} baris pada tabel halaman ini.")
-            
-            for row in rows:
-                cols = row.find_elements(By.TAG_NAME, "td")
-                col_data = [col.text.strip() for col in cols]
+            if len(col_data) > 8:
+                raw_job = col_data[1]
+                nama_mesin = col_data[5] 
+                personil = col_data[3]
+                jadwal_teks = col_data[9]
                 
-                if len(col_data) > 8:
-                    raw_job = col_data[1]
-                    nama_mesin = col_data[5] 
-                    personil = col_data[3]
-                    jadwal_teks = col_data[9]
-                    
-                    # LOG DEBUGGING: Cetak setiap baris yang terbaca untuk diperiksa di log GitHub
-                    print(f"   [Cek Baris] Job: {raw_job[:30]}... | Jadwal/Status: {jadwal_teks}")
-                    
-                    # Filter kata kunci & abaikan dial motor
-                    if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
-                        continue
-                    
-                    # Hanya ambil yang berstatus Done
-                    if "(done)" not in jadwal_teks.lower():
-                        continue
-                    
-                    parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
-                    raw_tgl_str = parts[0].strip()
-                    
-                    dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
-                    
-                    nama_motor = clean_motor_name(raw_job)
-                    keterangan = "" 
-                    periode = "90"
-                    
-                    next_dt = dt_obj + timedelta(days=90)
-                    tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
-                    
-                    # Format kolom akhir untuk Google Sheets
-                    row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
-                    processed_data.append(row_final)
-            
-            # Cek dan klik tombol "Selanjutnya" / Next Page
-            try:
-                next_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Selanjutnya')]")
-                parent_li = next_button.find_element(By.XPATH, "./..")
+                # Filter kata kunci & abaikan dial motor
+                if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
+                    continue
                 
-                if "disabled" in parent_li.get_attribute("class").lower():
-                    print("   Sudah mencapai halaman terakhir.")
-                    break
+                # Hanya ambil yang berstatus Done
+                if "(done)" not in jadwal_teks.lower():
+                    continue
                 
-                next_button.click()
-                page_num += 1
-                time.sleep(3)
-            except Exception:
-                print("   Tombol halaman selanjutnya tidak ditemukan atau sudah habis.")
-                break
+                parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
+                raw_tgl_str = parts[0].strip()
+                
+                dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
+                
+                nama_motor = clean_motor_name(raw_job)
+                keterangan = "" 
+                periode = "90"
+                
+                next_dt = dt_obj + timedelta(days=90)
+                tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
+                
+                # Format kolom akhir untuk Google Sheets
+                row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
+                processed_data.append(row_final)
                 
         print(f"\n=> Total keseluruhan data valid terkumpul: {len(processed_data)} baris.")
         
