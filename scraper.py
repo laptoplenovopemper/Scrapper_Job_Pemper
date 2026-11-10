@@ -9,7 +9,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# 1. INTEGRASI FITUR RENTANG TANGGAL KUSTOM DENGAN FALLBACK 30 HARI
+# 1. Menangkap rentang tanggal kustom dari Web App / GitHub Actions dengan fallback 30 hari terakhir
 date_from_env = os.getenv("INPUT_DATE_FROM", "").strip()
 date_to_env = os.getenv("INPUT_DATE_TO", "").strip()
 
@@ -26,7 +26,7 @@ LOGIN_URL = "http://job.pmp.web.id/login/"
 SEARCH_KEYWORD = "Ganti Motor"
 DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}&pic=&line=&mesin=&sub_mesin=&departemen=&bagian=&sub_bagian=&search={SEARCH_KEYWORD.replace(' ', '+')}"
 
-# Ambil Username & Password secara aman dari Secrets GitHub
+# Ambil Username & Password secara aman dari GitHub Secrets
 USERNAME = os.getenv("SCRAPER_USERNAME")                     
 PASSWORD = os.getenv("SCRAPER_PASSWORD")              
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
@@ -100,45 +100,69 @@ def run_scraper():
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
-        print("4. Mengambil dan memproses seluruh baris data...")
-        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
-        
+        print("4. Mengambil dan memproses seluruh baris data dari semua halaman...")
         processed_data = []
-        for row in rows:
-            cols = row.find_elements(By.TAG_NAME, "td")
-            col_data = [col.text.strip() for col in cols]
+        page_num = 1
+        
+        # Looping otomatis antar halaman (Pagination) sampai habis
+        while True:
+            print(f"-> Memproses halaman {page_num}...")
+            time.sleep(2)
             
-            if len(col_data) > 8:
-                raw_job = col_data[1]
-                nama_mesin = col_data[5] # Kolom Mesin dari sistem web
-                personil = col_data[3]
-                jadwal_teks = col_data[9]
+            rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
+            print(f"   Ditemukan {len(rows)} baris pada halaman ini.")
+            
+            for row in rows:
+                cols = row.find_elements(By.TAG_NAME, "td")
+                col_data = [col.text.strip() for col in cols]
                 
-                # Filter kata kunci utama & pengabaian dial motor
-                if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
-                    continue
+                if len(col_data) > 8:
+                    raw_job = col_data[1]
+                    nama_mesin = col_data[5] 
+                    personil = col_data[3]
+                    jadwal_teks = col_data[9]
+                    
+                    # Filter kata kunci & abaikan dial motor
+                    if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
+                        continue
+                    
+                    # Hanya ambil yang berstatus Done
+                    if "(done)" not in jadwal_teks.lower():
+                        continue
+                    
+                    parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
+                    raw_tgl_str = parts[0].strip()
+                    
+                    dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
+                    
+                    nama_motor = clean_motor_name(raw_job)
+                    keterangan = "" 
+                    periode = "90"
+                    
+                    next_dt = dt_obj + timedelta(days=90)
+                    tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
+                    
+                    # Format kolom akhir untuk Google Sheets
+                    row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
+                    processed_data.append(row_final)
+            
+            # Cek dan klik tombol "Selanjutnya" / Next Page
+            try:
+                next_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Selanjutnya')]")
+                parent_li = next_button.find_element(By.XPATH, "./..")
                 
-                # Hanya memproses data yang berstatus Done
-                if "(done)" not in jadwal_teks.lower():
-                    continue
+                if "disabled" in parent_li.get_attribute("class").lower():
+                    print("   Sudah mencapai halaman terakhir.")
+                    break
                 
-                parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
-                raw_tgl_str = parts[0].strip()
+                next_button.click()
+                page_num += 1
+                time.sleep(3)
+            except Exception:
+                print("   Tombol halaman selanjutnya tidak ditemukan atau sudah habis.")
+                break
                 
-                dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
-                
-                nama_motor = clean_motor_name(raw_job)
-                keterangan = "" 
-                periode = "90"
-                
-                next_dt = dt_obj + timedelta(days=90)
-                tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
-                
-                # Susunan kolom akhir: [Nama Motor, Nama Mesin, Tanggal Terakhir, Personil, Keterangan, Periode, Tanggal Selanjutnya]
-                row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
-                processed_data.append(row_final)
-                
-        print(f"-> Total data valid terkumpul: {len(processed_data)} baris.")
+        print(f"\n=> Total keseluruhan data valid terkumpul: {len(processed_data)} baris.")
         
         if processed_data:
             print("5. Mengirim seluruh data ke Google Sheets...")
