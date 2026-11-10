@@ -1,86 +1,75 @@
 import os
-from datetime import datetime, timedelta
+import time
 import requests
-from bs4 import BeautifulSoup
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime, timedelta
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
-# 1. Menangkap Parameter Tanggal dari Web App / GitHub Actions
+LOGIN_URL = "http://job.pmp.web.id/login/" 
+USERNAME = os.environ.get("SCRAPER_USERNAME", "hanif") # Bisa ambil dari Secrets GitHub atau fallback ke default
+PASSWORD = os.environ.get("SCRAPER_PASSWORD", "#12345678#")
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
+
+# Menangkap parameter tanggal dari Web App (Format: YYYY-MM-DD)
 date_from_input = os.environ.get("INPUT_DATE_FROM", "").strip()
 date_to_input = os.environ.get("INPUT_DATE_TO", "").strip()
 
-if date_from_input and date_to_input:
-    START_DATE = date_from_input
-    END_DATE = date_to_input
-else:
-    END_DATE = datetime.now().strftime("%Y-%m-%d")
-    START_DATE = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-
-# Ambil username & password dari GitHub Secrets
-USERNAME = os.environ.get("SCRAPER_USERNAME")
-PASSWORD = os.environ.get("SCRAPER_PASSWORD")
-
 def run_scraper():
-    scraped_data = []
-    print("Memulai proses scraping dengan autentikasi sesi...")
+    options = Options()
+    options.add_argument("--headless") # Wajib untuk server GitHub Actions
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     
-    # Gunakan Session agar cookie login tersimpan otomatis
-    session = requests.Session()
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    session.headers.update(headers)
+    # Menggunakan Chrome karena menggunakan ubuntu-latest di GitHub Actions
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
     try:
-        # LANGKAH A: LAKUKAN LOGIN TERLEBIH DAHULU (Sesuaikan URL & nama input form login PMP Anda)
-        login_url = "https://job.pmp.web.id/login" # Sesuaikan jika URL login berbeda
-        login_payload = {
-            "username": USERNAME, # Sesuaikan name attribute dari input form
-            "password": PASSWORD  # Sesuaikan name attribute dari input form
-        }
+        print("Membuka halaman login...")
+        driver.get(LOGIN_URL)
+        time.sleep(3)
         
-        print("Melakukan login ke website PMP...")
-        login_response = session.post(login_url, data=login_payload)
+        # Proses login menggunakan elemen yang sama seperti script lokal Anda
+        driver.find_element(By.ID, "id_username").send_keys(USERNAME)
+        driver.find_element(By.ID, "id_password").send_keys(PASSWORD)
+        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+        time.sleep(5) # Tunggu proses login selesai dan masuk dashboard
         
-        if login_response.status_code != 200:
-            print(f"Login gagal atau halaman login tidak merespons (Status: {login_response.status_code})")
-            return []
-
-        print("Login berhasil! Mengambil data halaman...")
-        
-        # LANGKAH B: TARIK DATA SETELAH LOGIN BERHASIL (Looping halaman 1 sampai 32)
-        total_pages = 32 
-        for page in range(1, total_pages + 1):
-            target_url = f"https://job.pmp.web.id/?date_from={START_DATE}&date_to={END_DATE}&daily_page={page}"
+        # Jika ada parameter tanggal kustom dari Web App, langsung akses URL filternya setelah login
+        if date_from_input and date_to_input:
+            target_url = f"http://job.pmp.web.id/?date_from={date_from_input}&date_to={date_to_input}"
+            print(f"Mengakses filter tanggal kustom: {target_url}")
+            driver.get(target_url)
+            time.sleep(4) # Tunggu tabel memperbarui data sesuai tanggal
             
-            response = session.get(target_url, timeout=10)
-            if response.status_code != 200:
-                break
+        filtered_data = []
+        
+        # Ambil data dari tabel (bisa disesuaikan jika ingin melooping halaman lebih dari 1)
+        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
+        print(f"Ditemukan {len(rows)} baris pada halaman ini.")
+        
+        for row in rows:
+            cols = row.find_elements(By.TAG_NAME, "td")
+            col_data = [col.text.strip() for col in cols]
+            
+            if col_data:
+                teks_pekerjaan = col_data[1].lower() if len(col_data) > 1 else col_data[0].lower()
+                if "ganti motor" in teks_pekerjaan:
+                    filtered_data.append(col_data)
                 
-            soup = BeautifulSoup(response.text, 'html.parser')
-            rows = soup.select("table tbody tr")
-            
-            if not rows:
-                break
-                
-            count = 0
-            for row in rows:
-                cols = row.find_all('td')
-                cols_text = [col.text.strip() for col in cols]
-                if cols_text and len(cols_text) > 1 and "Tidak ada" not in cols_text[0]:
-                    scraped_data.append(cols_text)
-                    count += 1
-            
-            print(f"Halaman {page}: Berhasil menarik {count} baris data.")
-            
-        print(f"Total keseluruhan data terkumpul: {len(scraped_data)} baris.")
-        return scraped_data
+        if filtered_data:
+            response = requests.post(APPS_SCRIPT_URL, json=filtered_data)
+            print("Berhasil kirim data ke Google Sheets:", response.text)
+        else:
+            print("Tidak ada data 'ganti motor' yang ditemukan pada rentang ini.")
 
     except Exception as e:
-        print(f"Terjadi kesalahan saat proses scraping: {str(e)}")
-        return []
+        print("Error saat scraping:", str(e))
+        
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
-    hasil_data = run_scraper()
-    # Tambahkan fungsi simpan ke Google Sheets di sini jika data sudah berhasil ditarik
+    run_scraper()
