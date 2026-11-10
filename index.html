@@ -86,14 +86,14 @@
                 <p class="mb-0 text-white-50 small">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
             </div>
             
-            <!-- Kontrol Filter Tanggal, Info Scraper, & Global Search -->
+            <!-- Kontrol Filter Tanggal, Tombol Trigger Scraper via Apps Script, & Global Search -->
             <div class="d-flex align-items-center gap-2 flex-wrap justify-content-lg-end">
                 <div class="input-group input-group-sm" style="width: auto;">
                     <span class="input-group-text bg-light text-secondary">Dari</span>
                     <input type="date" id="dateFrom" class="form-control form-control-sm">
                     <span class="input-group-text bg-light text-secondary">S/d</span>
                     <input type="date" id="dateTo" class="form-control form-control-sm">
-                    <button class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraperInfo()" title="Panduan Menarik Data">⚡ Info Tarik Data</button>
+                    <button class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraper()" title="Jalankan Scraper Otomatis">⚡ Tarik Data</button>
                 </div>
 
                 <input type="text" id="globalSearch" class="form-control form-control-sm shadow-sm" placeholder="🔍 Cari apa saja..." style="width: 180px;" oninput="renderTable(globalData)">
@@ -241,16 +241,50 @@
             renderTable(globalData);
         }
 
-        function triggerScraperInfo() {
+        function triggerScraper() {
             let dFrom = document.getElementById('dateFrom').value;
             let dTo = document.getElementById('dateTo').value;
 
             if (!dFrom || !dTo) {
-                alert("Silakan tentukan rentang tanggal 'Dari' dan 'S/d' terlebih dahulu di sebelah kiri tombol ini, lalu jalankan workflow di tab Actions GitHub.");
+                alert("Harap tentukan tanggal 'Dari' dan 'S/d' terlebih dahulu!");
                 return;
             }
 
-            alert(`Panduan Menarik Data:\n\nRentang tanggal terpilih: ${dFrom} s/d ${dTo}\n\nKarena token sudah aman di Repository Secrets (GH_PAT), silakan buka tab Actions di repository GitHub Anda, pilih workflow 'Run Daily Job Scraper', klik 'Run workflow', masukkan rentang tanggal tersebut, dan klik jalankan!`);
+            if (!confirm(`Jalankan penarikan data scraper otomatis dari tanggal ${dFrom} sampai ${dTo}?`)) {
+                return;
+            }
+
+            let btn = event.target;
+            let oldText = btn.innerText;
+            btn.innerText = "⏳ Memproses...";
+            btn.disabled = true;
+
+            let payload = {
+                action: "trigger_scraper",
+                date_from: dFrom,
+                date_to: dTo
+            };
+
+            fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(res => {
+                btn.innerText = oldText;
+                btn.disabled = false;
+                if (res.status === "success") {
+                    alert("Berhasil! Perintah tarik data telah dikirim ke GitHub Actions melalui Google Apps Script.\nTunggu 1-2 menit lalu muat ulang halaman ini.");
+                } else {
+                    alert("Gagal: " + res.message);
+                }
+            })
+            .catch(err => {
+                btn.innerText = oldText;
+                btn.disabled = false;
+                console.error(err);
+                alert("Terjadi kesalahan koneksi.");
+            });
         }
 
         function openAddModal() {
@@ -304,8 +338,8 @@
 
         document.getElementById('fTglTerakhir').addEventListener('input', hitungTanggalSelanjutnya);
 
-        document.getElementById('dataForm').addEventListener('submit', function(et) {
-            et.preventDefault();
+        document.getElementById('dataForm').addEventListener('submit', function(e) {
+            e.preventDefault();
             let index = document.getElementById('rowIndex').value;
             let rowData = [
                 document.getElementById('fNama').value,
