@@ -34,8 +34,14 @@ jobs:
         env:
           SCRAPER_USERNAME: ${{ secrets.SCRAPER_USERNAME }}
           SCRAPER_PASSWORD: ${{ secrets.SCRAPER_PASSWORD }}
-          # Meneruskan input dari web app / manual dispatch ke environment variables Python
           INPUT_DATE_FROM: ${{ github.event.inputs.date_from }}
           INPUT_DATE_TO: ${{ github.event.inputs.date_to }}
         run: |
           python scraper.py
+
+      - name: Upload Screenshot Artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: debug-screenshot
+          path: debug_error.png
