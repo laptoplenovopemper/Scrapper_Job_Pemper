@@ -86,14 +86,14 @@
                 <p class="mb-0 text-white-50 small">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
             </div>
             
-            <!-- Kontrol Filter, Trigger Scraper, & Global Search -->
+            <!-- Kontrol Filter Tanggal, Info Scraper, & Global Search -->
             <div class="d-flex align-items-center gap-2 flex-wrap justify-content-lg-end">
                 <div class="input-group input-group-sm" style="width: auto;">
                     <span class="input-group-text bg-light text-secondary">Dari</span>
                     <input type="date" id="dateFrom" class="form-control form-control-sm">
                     <span class="input-group-text bg-light text-secondary">S/d</span>
                     <input type="date" id="dateTo" class="form-control form-control-sm">
-                    <button class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraper()" title="Jalankan Scraper Sesuai Tanggal">⚡ Tarik Data</button>
+                    <button class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraperInfo()" title="Panduan Menarik Data">⚡ Info Tarik Data</button>
                 </div>
 
                 <input type="text" id="globalSearch" class="form-control form-control-sm shadow-sm" placeholder="🔍 Cari apa saja..." style="width: 180px;" oninput="renderTable(globalData)">
@@ -167,7 +167,7 @@
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
         let globalData = [];
-        let currentSortOrder = 'asc'; // State sorting Nama Mesin
+        let currentSortOrder = 'asc';
         let modalInstance = new bootstrap.Modal(document.getElementById('dataModal'));
 
         function loadData() {
@@ -191,18 +191,15 @@
             }
 
             let keyword = document.getElementById('globalSearch').value.toLowerCase();
-
-            // Pisahkan Header dari Data Utama
-            let headerRow = data[0];
             let rowsBody = data.slice(1);
 
-            // Filter Global Pencarian
+            // Global search untuk seluruh kata kunci di dalam tabel
             let filteredRows = rowsBody.filter(row => {
                 if (!keyword) return true;
                 return row.some(cell => String(cell).toLowerCase().includes(keyword));
             });
 
-            // Sorting berdasarkan Kolom Nama Mesin (Indeks 1)
+            // Sorting interaktif berdasarkan Kolom Nama Mesin (Indeks 1)
             filteredRows.sort((a, b) => {
                 let valA = (a[1] || '').toLowerCase();
                 let valB = (b[1] || '').toLowerCase();
@@ -222,7 +219,7 @@
             }
 
             filteredRows.forEach((row, idx) => {
-                let originalIndex = data.indexOf(row); // Indeks asli untuk tombol Edit/Hapus
+                let originalIndex = data.indexOf(row);
                 html += '<tr>';
                 html += `<td class="text-center fw-semibold" style="width: 50px;">${idx + 1}</td>`;
                 for (let j = 0; j < 7; j++) {
@@ -244,30 +241,16 @@
             renderTable(globalData);
         }
 
-        function triggerScraper() {
+        function triggerScraperInfo() {
             let dFrom = document.getElementById('dateFrom').value;
             let dTo = document.getElementById('dateTo').value;
 
             if (!dFrom || !dTo) {
-                alert("Harap tentukan tanggal 'Dari' dan 'S/d' terlebih dahulu!");
+                alert("Silakan tentukan rentang tanggal 'Dari' dan 'S/d' terlebih dahulu di sebelah kiri tombol ini, lalu jalankan workflow di tab Actions GitHub.");
                 return;
             }
 
-            // Integrasi GitHub Actions Repository Dispatch API
-            // Pastikan Anda telah membuat Personal Access Token (PAT) dan menyimpannya atau menggunakan trigger manual workflow
-            alert(`Meminta GitHub Actions menjalankan scraper untuk rentang tanggal: ${dFrom} s/d ${dTo}.\nSilakan cek tab Actions di GitHub Anda beberapa saat lagi.`);
-            
-            // Contoh pemanggilan API GitHub Workflow Dispatch (Opsional jika token diset di repo)
-            /*
-            fetch('https://api.github.com/repos/laptoplenovopemper/Scrapper_Job_Pemper/actions/workflows/main.yml/dispatches', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer GITHUB_TOKEN_ANDA',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ ref: 'main', inputs: { date_from: dFrom, date_to: dTo } })
-            });
-            */
+            alert(`Panduan Menarik Data:\n\nRentang tanggal terpilih: ${dFrom} s/d ${dTo}\n\nKarena token sudah aman di Repository Secrets (GH_PAT), silakan buka tab Actions di repository GitHub Anda, pilih workflow 'Run Daily Job Scraper', klik 'Run workflow', masukkan rentang tanggal tersebut, dan klik jalankan!`);
         }
 
         function openAddModal() {
@@ -321,8 +304,8 @@
 
         document.getElementById('fTglTerakhir').addEventListener('input', hitungTanggalSelanjutnya);
 
-        document.getElementById('dataForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        document.getElementById('dataForm').addEventListener('submit', function(et) {
+            et.preventDefault();
             let index = document.getElementById('rowIndex').value;
             let rowData = [
                 document.getElementById('fNama').value,
