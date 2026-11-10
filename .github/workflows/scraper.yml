@@ -1,18 +1,18 @@
 name: Run Daily Job Scraper
 
 on:
-  schedule:
-    - cron: '0 0 * * *' # Berjalan otomatis setiap pukul 07:00 WIB (00:00 UTC)
   workflow_dispatch:
     inputs:
       date_from:
         description: 'Tanggal Mulai (YYYY-MM-DD)'
         required: true
-        default: '2026-10-01'
+        type: string
       date_to:
         description: 'Tanggal Selesai (YYYY-MM-DD)'
         required: true
-        default: '2026-11-10'
+        type: string
+  schedule:
+    - cron: '0 0 * * *' # Tetap berjalan otomatis setiap hari jika diperlukan
 
 jobs:
   run-scraper:
@@ -28,13 +28,13 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install selenium webdriver-manager requests
+          pip install requests beautifulsoup4 gspread oauth2client selenium webdriver-manager
 
       - name: Run Scraper Script
         env:
           SCRAPER_USERNAME: ${{ secrets.SCRAPER_USERNAME }}
           SCRAPER_PASSWORD: ${{ secrets.SCRAPER_PASSWORD }}
-          # Menerima input tanggal dari web app atau default dari schedule
+          # Meneruskan input dari web app / manual dispatch ke environment variables Python
           INPUT_DATE_FROM: ${{ github.event.inputs.date_from }}
           INPUT_DATE_TO: ${{ github.event.inputs.date_to }}
         run: |
