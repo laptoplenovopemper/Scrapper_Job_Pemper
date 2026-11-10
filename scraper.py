@@ -12,39 +12,56 @@ date_to_input = os.environ.get("INPUT_DATE_TO", "").strip()
 if date_from_input and date_to_input:
     START_DATE = date_from_input
     END_DATE = date_to_input
-    print(f"=== Menggunakan Tanggal Kustom: {START_DATE} s/d {END_DATE} ===")
 else:
-    # Kembali ke default 30 hari terakhir jika kosong / dijalankan otomatis
     END_DATE = datetime.now().strftime("%Y-%m-%d")
     START_DATE = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
-    print(f"=== Menggunakan Tanggal Default (30 Hari Terakhir): {START_DATE} s/d {END_DATE} ===")
+
+# Ambil username & password dari GitHub Secrets
+USERNAME = os.environ.get("SCRAPER_USERNAME")
+PASSWORD = os.environ.get("SCRAPER_PASSWORD")
 
 def run_scraper():
     scraped_data = []
-    print("Memulai proses scraping...")
+    print("Memulai proses scraping dengan autentikasi sesi...")
+    
+    # Gunakan Session agar cookie login tersimpan otomatis
+    session = requests.Session()
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
-    
-    # Looping halaman (misal dari halaman 1 sampai 32)
-    total_pages = 32 
+    session.headers.update(headers)
     
     try:
+        # LANGKAH A: LAKUKAN LOGIN TERLEBIH DAHULU (Sesuaikan URL & nama input form login PMP Anda)
+        login_url = "https://job.pmp.web.id/login" # Sesuaikan jika URL login berbeda
+        login_payload = {
+            "username": USERNAME, # Sesuaikan name attribute dari input form
+            "password": PASSWORD  # Sesuaikan name attribute dari input form
+        }
+        
+        print("Melakukan login ke website PMP...")
+        login_response = session.post(login_url, data=login_payload)
+        
+        if login_response.status_code != 200:
+            print(f"Login gagal atau halaman login tidak merespons (Status: {login_response.status_code})")
+            return []
+
+        print("Login berhasil! Mengambil data halaman...")
+        
+        # LANGKAH B: TARIK DATA SETELAH LOGIN BERHASIL (Looping halaman 1 sampai 32)
+        total_pages = 32 
         for page in range(1, total_pages + 1):
             target_url = f"https://job.pmp.web.id/?date_from={START_DATE}&date_to={END_DATE}&daily_page={page}"
-            print(f"Mengambil data halaman {page}...")
             
-            response = requests.get(target_url, headers=headers, timeout=10)
+            response = session.get(target_url, timeout=10)
             if response.status_code != 200:
-                print(f"Gagal mengakses halaman {page}, status: {response.status_code}")
                 break
                 
             soup = BeautifulSoup(response.text, 'html.parser')
             rows = soup.select("table tbody tr")
             
             if not rows:
-                print(f"Halaman {page} kosong atau habis.")
                 break
                 
             count = 0
@@ -55,24 +72,15 @@ def run_scraper():
                     scraped_data.append(cols_text)
                     count += 1
             
-            print(f"Berhasil menarik {count} baris dari halaman {page}.")
+            print(f"Halaman {page}: Berhasil menarik {count} baris data.")
             
         print(f"Total keseluruhan data terkumpul: {len(scraped_data)} baris.")
         return scraped_data
 
     except Exception as e:
-        print(f"Terjadi kesalahan saat scraping: {str(e)}")
+        print(f"Terjadi kesalahan saat proses scraping: {str(e)}")
         return []
-
-def save_to_google_sheets(data):
-    if not data:
-        print("Tidak ada data untuk disimpan ke Google Sheets.")
-        return
-
-    print("Menyimpan data ke Google Sheets...")
-    # Masukkan logika gspread Anda di sini jika ingin otomatis memperbarui Google Sheets
-    print("Selesai!")
 
 if __name__ == "__main__":
     hasil_data = run_scraper()
-    save_to_google_sheets(hasil_data)
+    # Tambahkan fungsi simpan ke Google Sheets di sini jika data sudah berhasil ditarik
