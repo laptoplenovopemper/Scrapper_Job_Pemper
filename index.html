@@ -64,20 +64,40 @@
             vertical-align: middle;
             word-break: break-word;
         }
+        .sort-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        .sort-btn:hover {
+            color: #ffc107;
+        }
     </style>
 </head>
 <body>
 
     <header class="app-header">
-        <div class="container-fluid d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+        <div class="container-fluid d-flex flex-column flex-lg-row justify-content-between align-items-center gap-3">
             <div>
                 <h3 class="fw-bold mb-1">Data Pengecekan Berkala Motor</h3>
                 <p class="mb-0 text-white-50 small">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
             </div>
             
-            <!-- Area Filter Mesin & Tombol Tambah -->
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <input type="text" id="filterMesin" class="form-control form-control-sm shadow-sm" placeholder="🔍 Filter Nama Mesin..." style="width: 200px;" oninput="filterTableData()">
+            <!-- Kontrol Filter, Trigger Scraper, & Global Search -->
+            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-lg-end">
+                <div class="input-group input-group-sm" style="width: auto;">
+                    <span class="input-group-text bg-light text-secondary">Dari</span>
+                    <input type="date" id="dateFrom" class="form-control form-control-sm">
+                    <span class="input-group-text bg-light text-secondary">S/d</span>
+                    <input type="date" id="dateTo" class="form-control form-control-sm">
+                    <button class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraper()" title="Jalankan Scraper Sesuai Tanggal">⚡ Tarik Data</button>
+                </div>
+
+                <input type="text" id="globalSearch" class="form-control form-control-sm shadow-sm" placeholder="🔍 Cari apa saja..." style="width: 180px;" oninput="renderTable(globalData)">
+                
                 <button class="btn btn-light text-primary fw-semibold shadow-sm px-3 btn-sm" onclick="openAddModal()">
                     + Tambah Data Baru
                 </button>
@@ -147,6 +167,7 @@
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
         let globalData = [];
+        let currentSortOrder = 'asc'; // State sorting Nama Mesin
         let modalInstance = new bootstrap.Modal(document.getElementById('dataModal'));
 
         function loadData() {
@@ -169,47 +190,84 @@
                 return;
             }
 
-            let keyword = document.getElementById('filterMesin').value.toLowerCase();
+            let keyword = document.getElementById('globalSearch').value.toLowerCase();
+
+            // Pisahkan Header dari Data Utama
+            let headerRow = data[0];
+            let rowsBody = data.slice(1);
+
+            // Filter Global Pencarian
+            let filteredRows = rowsBody.filter(row => {
+                if (!keyword) return true;
+                return row.some(cell => String(cell).toLowerCase().includes(keyword));
+            });
+
+            // Sorting berdasarkan Kolom Nama Mesin (Indeks 1)
+            filteredRows.sort((a, b) => {
+                let valA = (a[1] || '').toLowerCase();
+                let valB = (b[1] || '').toLowerCase();
+                if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
 
             let html = '<div class="table-responsive w-100"><table class="table table-striped table-hover align-middle mb-0"><thead class="table-primary"><tr>';
             
-            const headers = ["No", "Nama Motor", "Nama Mesin", "Tanggal Penggantian Berkala Terakhir", "Personil", "Keterangan", "Periode", "Tanggal Berkala Selanjutnya", "Aksi"];
+            const headers = ["No", "Nama Motor", `Nama Mesin <button class="sort-btn" onclick="toggleSort()" title="Urutkan A-Z / Z-A">↕</button>`, "Tanggal Penggantian Berkala Terakhir", "Personil", "Keterangan", "Periode", "Tanggal Berkala Selanjutnya", "Aksi"];
             headers.forEach(h => html += `<th>${h}</th>`);
             html += '</tr></thead><tbody>';
 
-            let displayedCount = 0;
-            for (let i = 1; i < data.length; i++) {
-                let row = data[i];
-                let namaMesin = row[1] || ''; // Kolom Nama Mesin berada di indeks 1
+            if (filteredRows.length === 0) {
+                html += `<tr><td colspan="9" class="text-center text-secondary py-4">Tidak ditemukan data yang sesuai dengan kata kunci.</td></tr>`;
+            }
 
-                // Filter berdasarkan Nama Mesin
-                if (keyword && !namaMesin.toLowerCase().includes(keyword)) {
-                    continue;
-                }
-
-                displayedCount++;
+            filteredRows.forEach((row, idx) => {
+                let originalIndex = data.indexOf(row); // Indeks asli untuk tombol Edit/Hapus
                 html += '<tr>';
-                html += `<td class="text-center fw-semibold" style="width: 50px;">${displayedCount}</td>`;
+                html += `<td class="text-center fw-semibold" style="width: 50px;">${idx + 1}</td>`;
                 for (let j = 0; j < 7; j++) {
                     html += `<td>${row[j] || ''}</td>`;
                 }
                 html += `<td class="text-center" style="width: 160px;">
-                    <button class="btn btn-sm btn-warning text-white me-1 px-2" onclick="openEditModal(${i})">Edit</button>
-                    <button class="btn btn-sm btn-danger px-2" onclick="deleteData(${i})">Hapus</button>
+                    <button class="btn btn-sm btn-warning text-white me-1 px-2" onclick="openEditModal(${originalIndex})">Edit</button>
+                    <button class="btn btn-sm btn-danger px-2" onclick="deleteData(${originalIndex})">Hapus</button>
                 </td>`;
                 html += '</tr>';
-            }
-
-            if (displayedCount === 0) {
-                html += `<tr><td colspan="9" class="text-center text-secondary py-4">Tidak ditemukan data mesin dengan kata kunci tersebut.</td></tr>`;
-            }
+            });
 
             html += '</tbody></table></div>';
             container.innerHTML = html;
         }
 
-        function filterTableData() {
+        function toggleSort() {
+            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
             renderTable(globalData);
+        }
+
+        function triggerScraper() {
+            let dFrom = document.getElementById('dateFrom').value;
+            let dTo = document.getElementById('dateTo').value;
+
+            if (!dFrom || !dTo) {
+                alert("Harap tentukan tanggal 'Dari' dan 'S/d' terlebih dahulu!");
+                return;
+            }
+
+            // Integrasi GitHub Actions Repository Dispatch API
+            // Pastikan Anda telah membuat Personal Access Token (PAT) dan menyimpannya atau menggunakan trigger manual workflow
+            alert(`Meminta GitHub Actions menjalankan scraper untuk rentang tanggal: ${dFrom} s/d ${dTo}.\nSilakan cek tab Actions di GitHub Anda beberapa saat lagi.`);
+            
+            // Contoh pemanggilan API GitHub Workflow Dispatch (Opsional jika token diset di repo)
+            /*
+            fetch('https://api.github.com/repos/laptoplenovopemper/Scrapper_Job_Pemper/actions/workflows/main.yml/dispatches', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer GITHUB_TOKEN_ANDA',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ref: 'main', inputs: { date_from: dFrom, date_to: dTo } })
+            });
+            */
         }
 
         function openAddModal() {
