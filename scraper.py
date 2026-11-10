@@ -67,6 +67,7 @@ def run_scraper():
 
     except Exception as e:
         print(f"Terjadi kesalahan fatal saat scraping: {str(e)}")
+        driver.save_screenshot("debug_tampilan.png")
         driver.quit()
         return []
 
