@@ -10,22 +10,18 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 1. MENANGKAP PARAMETER TANGGAL LANGSUNG DALAM FORMAT YYYY-MM-DD
+# 1. Menangkap Parameter Tanggal dari Web App
 date_from_input = os.environ.get("INPUT_DATE_FROM", "").strip()
 date_to_input = os.environ.get("INPUT_DATE_TO", "").strip()
 
 if date_from_input and date_to_input:
-    START_DATE = date_from_input # Format sudah YYYY-MM-DD dari Web App
+    START_DATE = date_from_input
     END_DATE = date_to_input
     print(f"=== Menggunakan Tanggal Kustom: {START_DATE} s/d {END_DATE} ===")
 else:
-    # Default 30 hari terakhir jika dijalankan otomatis
     END_DATE = datetime.now().strftime("%Y-%m-%d")
     START_DATE = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
     print(f"=== Menggunakan Tanggal Default: {START_DATE} s/d {END_DATE} ===")
-
-USERNAME = os.environ.get("SCRAPER_USERNAME")
-PASSWORD = os.environ.get("SCRAPER_PASSWORD")
 
 def run_scraper():
     scraped_data = []
@@ -39,29 +35,38 @@ def run_scraper():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
     try:
-        # 2. LANGSUNG AKSES URL DENGAN PARAMETER QUERY TANGGAL
         target_url = f"https://job.pmp.web.id/?date_from={START_DATE}&date_to={END_DATE}"
         print(f"Mengakses URL Target: {target_url}")
         driver.get(target_url)
         
-        # Beri waktu halaman memuat data
-        wait = WebDriverWait(driver, 10)
-        wait.until(EC.presence_of_element_located((By.XPATH, "//table//tbody/tr")))
+        # 2. GUNAKAN EXPLICIT WAIT YANG KUAT (Menunggu tabel benar-benar muncul di DOM)
+        wait = WebDriverWait(driver, 20)
         
-        # 3. CONTOH EKSTRAKSI TABEL (Menarik baris data dari halaman yang tampil)
+        # Coba tunggu sampai elemen baris tabel pertama muncul (maksimal 20 detik)
+        try:
+            wait.until(EC.presence_of_element_located((By.XPATH, "//table//tbody/tr")))
+            print("Tabel berhasil dimuat oleh browser!")
+        except Exception as e:
+            print("Peringatan: Tabel tidak kunjung muncul atau kosong pada rentang tanggal ini.")
+            driver.save_screenshot("debug_error.png") # Menyimpan screenshot untuk dianalisis jika gagal
+            
+        # 3. CONTOH EKSTRAKSI DATA DARI TABEL
         rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
+        print(f"Ditemukan {len(rows)} baris pada halaman ini.")
+        
         for row in rows:
             cols = row.find_elements(By.TAG_NAME, "td")
             cols_text = [col.text.strip() for col in cols]
-            if cols_text and len(cols_text) > 1:
+            # Pastikan baris valid dan bukan baris 'Tidak ada data'
+            if cols_text and len(cols_text) > 1 and "Tidak ada" not in cols_text[0]:
                 scraped_data.append(cols_text)
                 
-        print(f"Berhasil mengambil {len(scraped_data)} baris data.")
+        print(f"Total data terkumpul sementara: {len(scraped_data)}")
         driver.quit()
         return scraped_data
 
     except Exception as e:
-        print(f"Terjadi kesalahan saat scraping: {str(e)}")
+        print(f"Terjadi kesalahan fatal saat scraping: {str(e)}")
         driver.quit()
         return []
 
@@ -71,15 +76,8 @@ def save_to_google_sheets(data):
         return
 
     print("Menyimpan data ke Google Sheets...")
-    # Masukkan kredensial dan logika gspread untuk menulis ke Google Sheets di sini
-    # Contoh:
-    # scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
-    # credentials = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
-    # gc = gspread.authorize(credentials)
-    # sheet = gc.open_by_key("1TJHsAW2_xdunVovqQ2yOwNfKyaXsutyHdOx7A9Cw4gs").sheet1
-    # sheet.clear() # Bersihkan data lama
-    # sheet.append_rows(data)
-    print("Data berhasil disimpan!")
+    # Masukkan logika gspread Anda di sini jika sudah siap
+    print("Selesai!")
 
 if __name__ == "__main__":
     hasil_data = run_scraper()
