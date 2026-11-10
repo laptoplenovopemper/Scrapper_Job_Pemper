@@ -24,8 +24,9 @@ else:
 
 LOGIN_URL = "http://job.pmp.web.id/login/" 
 SEARCH_KEYWORD = "Ganti Motor"
-# URL langsung membawa hasil filter tanggal & kata kunci secara akurat
-DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}&pic=&line=&mesin=&sub_mesin=&departemen=&bagian=&sub_bagian=&search={SEARCH_KEYWORD.replace(' ', '+')}"
+
+# Kita set page_size=100 agar dalam 1 halaman langsung tampil banyak baris
+DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}&pic=&line=&mesin=&sub_mesin=&departemen=&bagian=&sub_bagian=&search={SEARCH_KEYWORD.replace(' ', '+')}&page_size=100"
 
 # Ambil Username & Password secara aman dari GitHub Secrets
 USERNAME = os.getenv("SCRAPER_USERNAME")                     
@@ -97,48 +98,75 @@ def run_scraper():
         driver.find_element(By.XPATH, "//button[@type='submit']").click()
         time.sleep(5)
         
-        print(f"3. Mengakses URL Dashboard Filter: {DASHBOARD_URL}")
+        print(f"3. Mengakses URL Dashboard: {DASHBOARD_URL}")
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
-        print("4. Mengambil dan memproses seluruh baris data hasil filter...")
-        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
-        print(f"   Ditemukan total {len(rows)} baris pada tabel.")
-        
+        print("4. Mengambil dan memproses seluruh baris data dari semua halaman...")
         processed_data = []
-        for row in rows:
-            cols = row.find_elements(By.TAG_NAME, "td")
-            col_data = [col.text.strip() for col in cols]
+        page_num = 1
+        max_pages = 32 # Batas maksimal halaman sesuai info web Anda
+        
+        while page_num <= max_pages:
+            print(f"-> Memproses halaman {page_num} dari {max_pages}...")
+            time.sleep(2)
             
-            if len(col_data) > 8:
-                raw_job = col_data[1]
-                nama_mesin = col_data[5] 
-                personil = col_data[3]
-                jadwal_teks = col_data[9]
+            rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
+            print(f"   Ditemukan {len(rows)} baris pada halaman ini.")
+            
+            if not rows:
+                print("   Tabel kosong, menghentikan perayapan.")
+                break
                 
-                # Filter kata kunci & abaikan dial motor
-                if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
-                    continue
+            for row in rows:
+                cols = row.find_elements(By.TAG_NAME, "td")
+                col_data = [col.text.strip() for col in cols]
                 
-                # Hanya ambil yang berstatus Done
-                if "(done)" not in jadwal_teks.lower():
-                    continue
+                if len(col_data) > 8:
+                    raw_job = col_data[1]
+                    nama_mesin = col_data[5] 
+                    personil = col_data[3]
+                    jadwal_teks = col_data[9]
+                    
+                    # Filter kata kunci & abaikan dial motor
+                    if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
+                        continue
+                    
+                    # Hanya ambil yang berstatus Done
+                    if "(done)" not in jadwal_teks.lower():
+                        continue
+                    
+                    parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
+                    raw_tgl_str = parts[0].strip()
+                    
+                    dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
+                    
+                    nama_motor = clean_motor_name(raw_job)
+                    keterangan = "" 
+                    periode = "90"
+                    
+                    next_dt = dt_obj + timedelta(days=90)
+                    tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
+                    
+                    row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
+                    processed_data.append(row_final)
+            
+            # Cek tombol "Selanjutnya" secara aman
+            try:
+                next_button = driver.find_element(By.XPATH, "//a[contains(text(), 'Selanjutnya')]")
+                parent_li = next_button.find_element(By.XPATH, "./..")
                 
-                parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
-                raw_tgl_str = parts[0].strip()
+                # Jika tombol selanjutnya berstatus disabled atau kelasnya mengandung disabled
+                if "disabled" in parent_li.get_attribute("class").lower():
+                    print("   Sudah mencapai halaman terakhir (tombol disabled).")
+                    break
                 
-                dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
-                
-                nama_motor = clean_motor_name(raw_job)
-                keterangan = "" 
-                periode = "90"
-                
-                next_dt = dt_obj + timedelta(days=90)
-                tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
-                
-                # Format kolom akhir untuk Google Sheets
-                row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
-                processed_data.append(row_final)
+                next_button.click()
+                page_num += 1
+                time.sleep(3)
+            except Exception:
+                print("   Tombol 'Selanjutnya' tidak ditemukan lagi atau sudah di halaman terakhir.")
+                break
                 
         print(f"\n=> Total keseluruhan data valid terkumpul: {len(processed_data)} baris.")
         
