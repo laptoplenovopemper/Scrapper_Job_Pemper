@@ -8,8 +8,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-date_to = datetime.now().strftime("%Y-%m-%d")
-date_from = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+# Mengambil parameter tanggal dari GitHub Actions Environment (jika ada), atau gunakan default 30 hari lalu s/d hari ini
+date_to = os.getenv("INPUT_DATE_TO") or datetime.now().strftime("%Y-%m-%d")
+date_from = os.getenv("INPUT_DATE_FROM") or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+
+print(f"Menjalankan scraper untuk rentang tanggal: {date_from} sampai {date_to}")
 
 LOGIN_URL = "http://job.pmp.web.id/login/" 
 SEARCH_KEYWORD = "Ganti Motor"
