@@ -142,7 +142,7 @@
                     return;
                 }
 
-                globalData = result.slice(1); // Simpan data global (mengecualikan header)
+                globalData = result.slice(1); // Simpan data global (mengecualikan baris header sheets)
                 renderTable(globalData);
 
             } catch (error) {
@@ -276,7 +276,6 @@
 
                 const newData = [motor, mesin, tglTerakhir, personil, ket || "-", "90", tglSelanjutnya];
 
-                // Kirim ke Apps Script (Mode POST untuk Tambah)
                 submitToServer({ action: "add", data: newData });
             });
         }
@@ -284,7 +283,6 @@
         // --- FORM EDIT DATA ---
         function openEditModal(index) {
             const row = globalData[index];
-            // Konversi format tanggal kembali ke YYYY-MM-DD untuk input date HTML
             let parts = row[2] ? row[2].split('-') : [];
             let formattedDate = new Date().toISOString().split('T')[0];
             if(parts.length === 3) {
@@ -339,6 +337,7 @@
 
                 const updatedData = [motor, mesin, tglTerakhir, personil, ket || "-", "90", tglSelanjutnya];
 
+                // Sesuai dengan action "edit" di Code.gs
                 submitToServer({ action: "edit", index: parseInt(idx) + 1, data: updatedData });
             });
         }
@@ -361,8 +360,8 @@
                 });
                 const resText = await response.text();
                 closeModal();
-                alert("Berhasil: " + resText);
-                loadData(); // Muat ulang tabel
+                alert(resText);
+                loadData(); // Muat ulang tabel secara otomatis
             } catch (err) {
                 closeModal();
                 alert("Terjadi kesalahan koneksi ke server.");
@@ -370,16 +369,19 @@
             }
         }
 
+        // --- TRIGGER SCRAPER GITHUB ACTIONS ---
         function triggerScraperModal() {
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
             showModal("Picu Tarik Data Otomatis", `Sistem akan menjalankan GitHub Actions untuk mengambil data dari tanggal <b>${dateFrom || 'Default'}</b> s/d <b>${dateTo || 'Default'}</b>. Lanjutkan?`, "fa-solid fa-bolt", () => {
-                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghubungkan ke server GitHub Actions...</p></div>`, "fa-solid fa-sync", null, false);
-                setTimeout(() => {
-                    closeModal();
-                    alert("Perintah tarik data berhasil dikirim!");
-                }, 2000);
+                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghubungkan ke GitHub Actions...</p></div>`, "fa-solid fa-sync", null, false);
+                
+                submitToServer({ 
+                    action: "trigger_scraper", 
+                    date_from: dateFrom, 
+                    date_to: dateTo 
+                });
             });
         }
     </script>
