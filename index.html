@@ -87,7 +87,10 @@
                             <th class="py-3 px-4">Personil</th>
                             <th class="py-3 px-4">Keterangan</th>
                             <th class="py-3 px-4 text-center">Periode</th>
-                            <th class="py-3 px-4">Tanggal Berkala Selanjutnya</th>
+                            <!-- Kolom dengan Fitur Sort -->
+                            <th class="py-3 px-4 cursor-pointer hover:bg-slate-700 transition select-none" onclick="toggleSortDate()">
+                                Tanggal Berkala Selanjutnya <i id="sortIcon" class="fa-solid fa-sort ml-1 text-slate-400"></i>
+                            </th>
                             <th class="py-3 px-4 text-center">Aksi</th>
                         </tr>
                     </thead>
@@ -128,6 +131,7 @@
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
         let globalData = [];
+        let sortAscending = true; // Status sorting tanggal berikutnya
 
         async function loadData() {
             try {
@@ -142,7 +146,7 @@
                     return;
                 }
 
-                globalData = result.slice(1); // Simpan data global (mengecualikan baris header sheets)
+                globalData = result.slice(1); // Simpan data (tanpa header sheets)
                 renderTable(globalData);
 
             } catch (error) {
@@ -169,7 +173,7 @@
                     <td class="py-3 px-4 font-medium text-emerald-600">${row[6] || '-'}</td>
                     <td class="py-3 px-4 text-center space-x-1">
                         <button onclick="openEditModal(${index})" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
-                        <button onclick="deleteData(${index})" class="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-trash"></i></button>
+                        <button onclick="openDeleteModal(${index})" class="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -178,17 +182,45 @@
 
         window.onload = loadData;
 
+        // --- FITUR SORTING BERDASARKAN TANGGAL BERKALA SELANJUTNYA ---
+        function toggleSortDate() {
+            sortAscending = !sortAscending;
+            const sortIcon = document.getElementById('sortIcon');
+            sortIcon.className = sortAscending ? "fa-solid fa-sort-up ml-1 text-sky-400" : "fa-solid fa-sort-down ml-1 text-sky-400";
+
+            globalData.sort((a, b) => {
+                let dateA = parseLocalDate(a[6]);
+                let dateB = parseLocalDate(b[6]);
+                return sortAscending ? dateA - dateB : dateB - dateA;
+            });
+
+            renderTable(globalData);
+        }
+
+        function parseLocalDate(dateStr) {
+            if (!dateStr) return new Date(0);
+            let parts = dateStr.split('-'); // Format DD-MM-YY
+            if (parts.length === 3) {
+                return new Date(`20${parts[2]}`, parts[1] - 1, parts[0]);
+            }
+            return new Date(0);
+        }
+
         function filterTable() {
             let input = document.getElementById('searchInput').value.toLowerCase();
             let filtered = globalData.filter(row => row.some(cell => String(cell).toLowerCase().includes(input)));
             renderTable(filtered);
         }
 
-        function showModal(title, messageHtml, iconClass, onConfirmCallback, showFooter = true) {
+        function showModal(title, messageHtml, iconClass, onConfirmCallback, showFooter = true, confirmBtnText = "Ya, Lanjutkan", confirmBtnClass = "bg-pmpAccent hover:bg-pmpHover") {
             document.getElementById('modalTitle').innerHTML = `<i class="${iconClass} text-sky-400 mr-2"></i> ${title}`;
             document.getElementById('modalBody').innerHTML = messageHtml;
             document.getElementById('modalFooter').style.display = showFooter ? 'flex' : 'none';
             
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            confirmBtn.innerText = confirmBtnText;
+            confirmBtn.className = `px-4 py-2 ${confirmBtnClass} text-white font-medium rounded-lg text-sm transition shadow-sm`;
+
             const modal = document.getElementById('customModal');
             const container = document.getElementById('modalContainer');
             
@@ -200,7 +232,6 @@
             }, 10);
 
             if (showFooter && onConfirmCallback) {
-                const confirmBtn = document.getElementById('modalConfirmBtn');
                 const newBtn = confirmBtn.cloneNode(true);
                 confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
                 newBtn.addEventListener('click', () => {
@@ -260,14 +291,12 @@
                     return;
                 }
 
-                // Format Tanggal Terakhir (DD-MM-YY)
                 const dObj = new Date(tglInput);
                 const day = String(dObj.getDate()).padStart(2, '0');
                 const month = String(dObj.getMonth() + 1).padStart(2, '0');
                 const year = String(dObj.getFullYear()).slice(-2);
                 const tglTerakhir = `${day}-${month}-${year}`;
 
-                // Hitung Tanggal Selanjutnya (+90 hari otomatis)
                 dObj.setDate(dObj.getDate() + 90);
                 const nextDay = String(dObj.getDate()).padStart(2, '0');
                 const nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
@@ -275,12 +304,11 @@
                 const tglSelanjutnya = `${nextDay}-${nextMonth}-${nextYear}`;
 
                 const newData = [motor, mesin, tglTerakhir, personil, ket || "-", "90", tglSelanjutnya];
-
                 submitToServer({ action: "add", data: newData });
-            });
+            }, true, "Simpan Data", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // --- FORM EDIT DATA ---
+        // --- FORM EDIT DATA (Lengkap dengan Periode) ---
         function openEditModal(index) {
             const row = globalData[index];
             let parts = row[2] ? row[2].split('-') : [];
@@ -288,6 +316,7 @@
             if(parts.length === 3) {
                 formattedDate = `20${parts[2]}-${parts[1]}-${parts[0]}`;
             }
+            let currentPeriode = row[5] || '90';
 
             const htmlForm = `
                 <div class="space-y-4">
@@ -305,6 +334,10 @@
                         <input type="date" id="editTanggal" value="${formattedDate}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
                     </div>
                     <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">PERIODE (HARI)</label>
+                        <input type="number" id="editPeriode" value="${currentPeriode}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1">PERSONIL</label>
                         <input type="text" id="editPersonil" value="${row[3] || ''}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
                     </div>
@@ -320,6 +353,7 @@
                 const motor = document.getElementById('editMotor').value.trim();
                 const mesin = document.getElementById('editMesin').value.trim();
                 const tglInput = document.getElementById('editTanggal').value;
+                const periodeVal = parseInt(document.getElementById('editPeriode').value) || 90;
                 const personil = document.getElementById('editPersonil').value.trim();
                 const ket = document.getElementById('editKeterangan').value.trim();
 
@@ -329,24 +363,34 @@
                 const year = String(dObj.getFullYear()).slice(-2);
                 const tglTerakhir = `${day}-${month}-${year}`;
 
-                dObj.setDate(dObj.getDate() + 90);
+                // Hitung otomatis berdasarkan periode yang diisi
+                dObj.setDate(dObj.getDate() + periodeVal);
                 const nextDay = String(dObj.getDate()).padStart(2, '0');
                 const nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
                 const nextYear = String(dObj.getFullYear()).slice(-2);
                 const tglSelanjutnya = `${nextDay}-${nextMonth}-${nextYear}`;
 
-                const updatedData = [motor, mesin, tglTerakhir, personil, ket || "-", "90", tglSelanjutnya];
+                const updatedData = [motor, mesin, tglTerakhir, personil, ket || "-", String(periodeVal), tglSelanjutnya];
 
-                // Sesuai dengan action "edit" di Code.gs
                 submitToServer({ action: "edit", index: parseInt(idx) + 1, data: updatedData });
-            });
+            }, true, "Simpan Perubahan", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // --- HAPUS DATA ---
-        function deleteData(index) {
-            if (confirm("Apakah Anda yakin ingin menghapus data ini?")) {
+        // --- MODAL POP-UP HAPUS (Diseragamkan) ---
+        function openDeleteModal(index) {
+            const row = globalData[index];
+            const messageHtml = `
+                <div class="text-center py-2">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
+                    <p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus data motor:</p>
+                    <p class="text-slate-900 font-bold mt-1">"${row[0]}" (${row[1]})?</p>
+                    <p class="text-xs text-slate-400 mt-2">Tindakan ini tidak dapat dibatalkan.</p>
+                </div>
+            `;
+
+            showModal("Konfirmasi Hapus Data", messageHtml, "fa-solid fa-trash-can", () => {
                 submitToServer({ action: "delete", index: index + 1 });
-            }
+            }, true, "Ya, Hapus", "bg-rose-500 hover:bg-rose-600");
         }
 
         // --- FUNGSI KIRIM KE SERVER APPS SCRIPT ---
@@ -361,7 +405,7 @@
                 const resText = await response.text();
                 closeModal();
                 alert(resText);
-                loadData(); // Muat ulang tabel secara otomatis
+                loadData(); // Muat ulang tabel
             } catch (err) {
                 closeModal();
                 alert("Terjadi kesalahan koneksi ke server.");
@@ -382,7 +426,7 @@
                     date_from: dateFrom, 
                     date_to: dateTo 
                 });
-            });
+            }, true, "Ya, Lanjutkan", "bg-amber-500 hover:bg-amber-600");
         }
     </script>
 </body>
