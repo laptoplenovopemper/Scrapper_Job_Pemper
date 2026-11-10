@@ -96,7 +96,7 @@ def run_scraper():
         driver.find_element(By.XPATH, "//button[@type='submit']").click()
         time.sleep(5)
         
-        print(f"3. Mengakses data pencarian '{SEARCH_KEYWORD}'...")
+        print(f"3. Mengakses URL Dashboard: {DASHBOARD_URL}")
         driver.get(DASHBOARD_URL)
         time.sleep(5)
         
@@ -110,7 +110,7 @@ def run_scraper():
             time.sleep(2)
             
             rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
-            print(f"   Ditemukan {len(rows)} baris pada halaman ini.")
+            print(f"   Ditemukan {len(rows)} baris pada tabel halaman ini.")
             
             for row in rows:
                 cols = row.find_elements(By.TAG_NAME, "td")
@@ -121,6 +121,9 @@ def run_scraper():
                     nama_mesin = col_data[5] 
                     personil = col_data[3]
                     jadwal_teks = col_data[9]
+                    
+                    # LOG DEBUGGING: Cetak setiap baris yang terbaca untuk diperiksa di log GitHub
+                    print(f"   [Cek Baris] Job: {raw_job[:30]}... | Jadwal/Status: {jadwal_teks}")
                     
                     # Filter kata kunci & abaikan dial motor
                     if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
