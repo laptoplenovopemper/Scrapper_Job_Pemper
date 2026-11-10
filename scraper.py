@@ -1,5 +1,6 @@
 import os
 import time
+import re
 import requests
 from datetime import datetime, timedelta
 from selenium import webdriver
@@ -8,72 +9,146 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
+# 1. INTEGRASI FITUR RENTANG TANGGAL KUSTOM DENGAN FALLBACK 30 HARI
+date_from_env = os.getenv("INPUT_DATE_FROM", "").strip()
+date_to_env = os.getenv("INPUT_DATE_TO", "").strip()
+
+if date_from_env and date_to_env:
+    date_from = date_from_env
+    date_to = date_to_env
+    print(f"=== Menggunakan Tanggal Kustom: {date_from} s/d {date_to} ===")
+else:
+    date_to = datetime.now().strftime("%Y-%m-%d")
+    date_from = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    print(f"=== Menggunakan Tanggal Default (30 Hari Terakhir): {date_from} s/d {date_to} ===")
+
 LOGIN_URL = "http://job.pmp.web.id/login/" 
+SEARCH_KEYWORD = "Ganti Motor"
+DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}&pic=&line=&mesin=&sub_mesin=&departemen=&bagian=&sub_bagian=&search={SEARCH_KEYWORD.replace(' ', '+')}"
 
-# AMBIL KREDENSIAL DARI GITHUB SECRETS (Aman, tidak terekspos di kode publik)
-USERNAME = os.environ.get("SCRAPER_USERNAME")
-PASSWORD = os.environ.get("SCRAPER_PASSWORD")
-
+# Ambil Username & Password secara aman dari Secrets GitHub
+USERNAME = os.getenv("SCRAPER_USERNAME")                     
+PASSWORD = os.getenv("SCRAPER_PASSWORD")              
 APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 
-# Menangkap parameter tanggal dari Web App (Format: YYYY-MM-DD)
-date_from_input = os.environ.get("INPUT_DATE_FROM", "").strip()
-date_to_input = os.environ.get("INPUT_DATE_TO", "").strip()
+def universal_date_converter(date_str):
+    clean_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
+    current_year = datetime.now().year
+    
+    bulan_indo = {
+        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 
+        'mei': 'May', 'jun': 'Jun', 'jul': 'Jul', 'agu': 'Aug', 
+        'sep': 'Sep', 'okt': 'Oct', 'nov': 'Nov', 'des': 'Dec',
+        'januari': 'January', 'februari': 'February', 'maret': 'March', 'april': 'April',
+        'mei': 'May', 'juni': 'June', 'juli': 'July', 'agustus': 'August',
+        'september': 'September', 'oktober': 'October', 'november': 'November', 'desember': 'December'
+    }
+    
+    lower_str = clean_str.lower()
+    for id_m, en_m in bulan_indo.items():
+        if id_m in lower_str:
+            clean_str = re.sub(id_m, en_m, lower_str, flags=re.IGNORECASE)
+            break
+            
+    formats = [
+        "%d %b %Y", "%d %b %y", "%d %B %Y", "%d %B", "%d %b", 
+        "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d-%m-%y"
+    ]
+    
+    parsed_date = None
+    for fmt in formats:
+        try:
+            if "%Y" not in fmt and "%y" not in fmt:
+                parsed_date = datetime.strptime(f"{clean_str} {current_year}", f"%d %b %Y")
+            else:
+                parsed_date = datetime.strptime(clean_str, fmt)
+            break
+        except:
+            continue
+            
+    if parsed_date:
+        return parsed_date, parsed_date.strftime("%d-%m-%y")
+    
+    return datetime.now(), clean_str
+
+def clean_motor_name(raw_text):
+    text = re.sub(r'^(ganti\s+motor\s*|cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)', '', raw_text, flags=re.IGNORECASE)
+    text = re.split(r'(&|,|\bTrial\b)', text)[0].strip()
+    return text if text else raw_text
 
 def run_scraper():
+    print("1. Menyiapkan browser Chrome Headless...")
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
     
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
     try:
-        print("Membuka halaman login...")
+        print("2. Membuka halaman login...")
         driver.get(LOGIN_URL)
         time.sleep(3)
         
-        # Login otomatis menggunakan rahasia dari Secrets
         driver.find_element(By.ID, "id_username").send_keys(USERNAME)
         driver.find_element(By.ID, "id_password").send_keys(PASSWORD)
         driver.find_element(By.XPATH, "//button[@type='submit']").click()
         time.sleep(5)
         
-        # Jika ada parameter tanggal kustom dari Web App
-        if date_from_input and date_to_input:
-            target_url = f"http://job.pmp.web.id/?date_from={date_from_input}&date_to={date_to_input}"
-            print(f"Mengakses filter tanggal kustom: {target_url}")
-            driver.get(target_url)
-            time.sleep(4)
-            
-        filtered_data = []
-        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
-        print(f"Ditemukan {len(rows)} baris pada halaman ini.")
+        print(f"3. Mengakses data pencarian '{SEARCH_KEYWORD}'...")
+        driver.get(DASHBOARD_URL)
+        time.sleep(5)
         
+        print("4. Mengambil dan memproses seluruh baris data...")
+        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
+        
+        processed_data = []
         for row in rows:
             cols = row.find_elements(By.TAG_NAME, "td")
             col_data = [col.text.strip() for col in cols]
             
-            if len(col_data) > 2:
-                teks_baris = " ".join(col_data).lower()
+            if len(col_data) > 8:
+                raw_job = col_data[1]
+                nama_mesin = col_data[5] # Kolom Mesin dari sistem web
+                personil = col_data[3]
+                jadwal_teks = col_data[9]
                 
-                # 1. ABAIKAN / SKIP jika mengandung kata "dial motor"
-                if "dial motor" in teks_baris:
+                # Filter kata kunci utama & pengabaian dial motor
+                if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
                     continue
                 
-                # 2. AMBIL HANYA yang berstatus "done" / selesai
-                if "done" in teks_baris or "selesai" in teks_baris:
-                    # 3. Lakukan penyesuaian/konversi kolom data di sini jika diperlukan
-                    filtered_data.append(col_data)
+                # Hanya memproses data yang berstatus Done
+                if "(done)" not in jadwal_teks.lower():
+                    continue
                 
-        if filtered_data:
-            response = requests.post(APPS_SCRIPT_URL, json=filtered_data)
-            print("Berhasil kirim data bersih ke Google Sheets:", response.text)
+                parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
+                raw_tgl_str = parts[0].strip()
+                
+                dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
+                
+                nama_motor = clean_motor_name(raw_job)
+                keterangan = "" 
+                periode = "90"
+                
+                next_dt = dt_obj + timedelta(days=90)
+                tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
+                
+                # Susunan kolom akhir: [Nama Motor, Nama Mesin, Tanggal Terakhir, Personil, Keterangan, Periode, Tanggal Selanjutnya]
+                row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
+                processed_data.append(row_final)
+                
+        print(f"-> Total data valid terkumpul: {len(processed_data)} baris.")
+        
+        if processed_data:
+            print("5. Mengirim seluruh data ke Google Sheets...")
+            response = requests.post(APPS_SCRIPT_URL, json=processed_data)
+            print("Respon server Google Sheets:", response.text)
         else:
-            print("Tidak ada data 'Done' (selain dial motor) yang ditemukan pada rentang ini.")
+            print("Tidak ada data 'Done' yang memenuhi kriteria pada rentang tanggal ini.")
 
     except Exception as e:
-        print("Error saat scraping:", str(e))
+        print("\n[ERROR]:", str(e))
         
     finally:
         driver.quit()
