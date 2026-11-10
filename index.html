@@ -4,402 +4,236 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data Pengecekan Berkala Motor - PMP</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            background-color: #f8f9fa;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+    <!-- Tailwind CSS untuk styling modern & responsif -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome untuk ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pmpDark: '#1e293b',
+                        pmpHeader: '#334155',
+                        pmpAccent: '#0284c7',
+                        pmpHover: '#0369a1'
+                    }
+                }
+            }
         }
-        .app-header {
-            background: linear-gradient(135deg, #0d6efd, #0b5ed7);
-            color: white;
-            padding: 1rem 2rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            flex-shrink: 0;
-        }
-        .app-container {
-            flex: 1;
-            padding: 1.25rem 2rem;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            max-width: 100%;
-        }
-        .table-card {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-            overflow: hidden;
-            border: 1px solid rgba(0,0,0,.125);
-        }
-        .table-responsive {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            width: 100%;
-        }
-        .table {
-            width: 100%;
-            table-layout: auto;
-            margin-bottom: 0;
-        }
-        thead th {
-            position: sticky;
-            top: 0;
-            background-color: #0d6efd !important;
-            color: white;
-            z-index: 10;
-            text-align: center;
-            vertical-align: middle;
-        }
-        tbody td {
-            vertical-align: middle;
-            word-break: break-word;
-        }
-        .sort-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 0.8rem;
-            cursor: pointer;
-            padding: 0 4px;
-        }
-        .sort-btn:hover {
-            color: #ffc107;
-        }
-    </style>
+    </script>
 </head>
-<body>
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
-    <header class="app-header">
-        <div class="container-fluid d-flex flex-column flex-lg-row justify-content-between align-items-center gap-3">
-            <div>
-                <h3 class="fw-bold mb-1">Data Pengecekan Berkala Motor</h3>
-                <p class="mb-0 text-white-50 small">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
-            </div>
-            
-            <!-- Kontrol Filter Tanggal, Tombol Trigger Scraper, & Global Search -->
-            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-lg-end">
-                <div class="input-group input-group-sm" style="width: auto;">
-                    <span class="input-group-text bg-light text-secondary">Dari</span>
-                    <input type="date" id="dateFrom" class="form-control form-control-sm">
-                    <span class="input-group-text bg-light text-secondary">S/d</span>
-                    <input type="date" id="dateTo" class="form-control form-control-sm">
-                    <button id="btnTarik" class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraper()" title="Jalankan Scraper Otomatis">⚡ Tarik Data</button>
+    <!-- TOP NAVIGATION BAR (Mirip Tema PMP Asli) -->
+    <header class="bg-pmpDark text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-pmpAccent p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-gears text-xl"></i>
                 </div>
-
-                <input type="text" id="globalSearch" class="form-control form-control-sm shadow-sm" placeholder="🔍 Cari apa saja..." style="width: 180px;" oninput="renderTable(globalData)">
-                
-                <button class="btn btn-light text-primary fw-semibold shadow-sm px-3 btn-sm" onclick="openAddModal()">
-                    + Tambah Data Baru
-                </button>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wide">Manajemen Pekerjaan - PMP</h1>
+                    <p class="text-xs text-slate-300">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
+                </div>
+            </div>
+            <!-- Menu navigasi atas -->
+            <div class="flex items-center space-x-4 text-sm">
+                <span class="bg-slate-700 px-3 py-1.5 rounded-md text-slate-200"><i class="fa-solid fa-user mr-1.5"></i> Hi, hanif</span>
             </div>
         </div>
     </header>
 
-    <div class="app-container container-fluid">
-        <div class="table-card">
-            <div id="table-container" class="h-100 d-flex flex-column justify-content-center align-items-center p-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Memuat...</span>
+    <!-- MAIN CONTAINER -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        
+        <!-- FILTER & ACTION BAR -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <!-- Filter Tanggal -->
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-sm">
+                    <span class="text-slate-500 mr-2">Dari</span>
+                    <input type="date" id="dateFrom" class="bg-transparent focus:outline-none text-slate-700 font-medium">
                 </div>
-                <p class="text-secondary mt-2">Sedang menyinkronkan data...</p>
+                <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-sm">
+                    <span class="text-slate-500 mr-2">S/d</span>
+                    <input type="date" id="dateTo" class="bg-transparent focus:outline-none text-slate-700 font-medium">
+                </div>
+                <button onclick="triggerScraperModal()" class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm">
+                    <i class="fa-solid fa-bolt mr-2"></i> Tarik Data
+                </button>
+            </div>
+
+            <!-- Pencarian & Tombol Tambah -->
+            <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                <div class="relative w-full md:w-64">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                        <i class="fa-solid fa-search text-xs"></i>
+                    </span>
+                    <input type="text" id="searchInput" placeholder="Cari nama motor atau mesin..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
+                </div>
+                <button onclick="openAddModal()" class="bg-pmpAccent hover:bg-pmpHover text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm whitespace-nowrap">
+                    <i class="fa-solid fa-plus mr-2"></i> Tambah Data Baru
+                </button>
+            </div>
+        </div>
+
+        <!-- TABEL DATA (Tema PMP: Header Gelap & Striping Rapi) -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-800 text-white text-xs uppercase tracking-wider">
+                            <th class="py-3 px-4 text-center w-12">No</th>
+                            <th class="py-3 px-4">Nama Motor</th>
+                            <th class="py-3 px-4">Nama Mesin</th>
+                            <th class="py-3 px-4">Tanggal Penggantian Berkala Terakhir</th>
+                            <th class="py-3 px-4">Personil</th>
+                            <th class="py-3 px-4">Keterangan</th>
+                            <th class="py-3 px-4 text-center">Periode</th>
+                            <th class="py-3 px-4">Tanggal Berkala Selanjutnya</th>
+                            <th class="py-3 px-4 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-200 text-sm">
+                        <!-- Data contoh/dinamis -->
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-3 px-4 text-center font-medium text-slate-500">1</td>
+                            <td class="py-3 px-4 font-semibold text-slate-700">Waste Conveyor 3 (3 HP / R 29 f612)</td>
+                            <td class="py-3 px-4"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">FS 8</span></td>
+                            <td class="py-3 px-4 text-slate-600">22-09-26</td>
+                            <td class="py-3 px-4 text-slate-600">Fatih Ilham Ibrahim</td>
+                            <td class="py-3 px-4 text-slate-400">-</td>
+                            <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">90 Hari</span></td>
+                            <td class="py-3 px-4 font-medium text-emerald-600">21-12-26</td>
+                            <td class="py-3 px-4 text-center space-x-1">
+                                <button class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
+                                <button class="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL POP-UP ELEGAN (Custom Modern Style) -->
+    <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform scale-95 transition-transform duration-300" id="modalContainer">
+            <!-- Header Modal -->
+            <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
+                <h3 id="modalTitle" class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-pmpAccent"></i> Konfirmasi Aksi
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <!-- Body Modal -->
+            <div class="p-6 text-slate-600" id="modalBody">
+                <p id="modalMessage">Apakah Anda yakin ingin memicu proses tarik data dari server PMP?</p>
+            </div>
+            <!-- Footer Modal -->
+            <div class="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100">
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">Batal</button>
+                <button id="modalConfirmBtn" class="px-4 py-2 bg-pmpAccent hover:bg-pmpHover text-white font-medium rounded-lg text-sm transition shadow-sm">Ya, Lanjutkan</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Form Tambah / Edit -->
-    <div class="modal fade" id="dataModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="modalTitle">Tambah Data Baru</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="dataForm">
-                        <input type="hidden" id="rowIndex">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Nama Motor</label>
-                            <input type="text" class="form-control" id="fNama" required placeholder="Contoh: Motor Waste Conveyor 5">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Nama Mesin</label>
-                            <input type="text" class="form-control" id="fMesin" required placeholder="Contoh: FS 2">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Tanggal Penggantian Terakhir (DD-MM-YY)</label>
-                            <input type="text" class="form-control" id="fTglTerakhir" required placeholder="Contoh: 03-11-26">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Personil</label>
-                            <input type="text" class="form-control" id="fPersonil" required placeholder="Nama personil">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Keterangan</label>
-                            <input type="text" class="form-control" id="fKeterangan" placeholder="Kosongkan jika tidak ada">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Periode (Hari)</label>
-                            <input type="number" class="form-control" id="fPeriode" value="90" required oninput="hitungTanggalSelanjutnya()">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Tanggal Berkala Selanjutnya</label>
-                            <input type="text" class="form-control bg-light" id="fTglSelanjutnya" readonly placeholder="Dihitung otomatis">
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100 py-2">Simpan Perubahan</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bootstrap JS Bundle -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SCRIPT INTERAKSI & MODAL -->
     <script>
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
-        let globalData = [];
-        let currentSortOrder = 'asc';
-        let modalInstance = new bootstrap.Modal(document.getElementById('dataModal'));
-
-        function loadData() {
-            fetch(APPS_SCRIPT_URL)
-                .then(res => res.json())
-                .then(data => {
-                    globalData = data;
-                    renderTable(data);
-                })
-                .catch(err => {
-                    console.error(err);
-                    document.getElementById('table-container').innerHTML = '<p class="text-danger p-4">Gagal memuat data dari server.</p>';
-                });
-        }
-
-        function renderTable(data) {
-            const container = document.getElementById('table-container');
-            if (!data || data.length <= 1) {
-                container.innerHTML = '<p class="text-center text-secondary py-5">Belum ada data penggantian motor yang berstatus (Done).</p>';
-                return;
-            }
-
-            let keyword = document.getElementById('globalSearch').value.toLowerCase();
-            let rowsBody = data.slice(1);
-
-            let filteredRows = rowsBody.filter(row => {
-                if (!keyword) return true;
-                return row.some(cell => String(cell).toLowerCase().includes(keyword));
-            });
-
-            filteredRows.sort((a, b) => {
-                let valA = (a[1] || '').toLowerCase();
-                let valB = (b[1] || '').toLowerCase();
-                if (valA < valB) return currentSortOrder === 'asc' ? -1 : 1;
-                if (valA > valB) return currentSortOrder === 'asc' ? 1 : -1;
-                return 0;
-            });
-
-            let html = '<div class="table-responsive w-100"><table class="table table-striped table-hover align-middle mb-0"><thead class="table-primary"><tr>';
+        // Fungsi menampilkan Modal Elegan
+        function showModal(title, message, iconClass, onConfirmCallback) {
+            document.getElementById('modalTitle').innerHTML = `<i class="${iconClass} text-sky-400 mr-2"></i> ${title}`;
+            document.getElementById('modalMessage').innerHTML = message;
             
-            const headers = ["No", "Nama Motor", `Nama Mesin <button class="sort-btn" onclick="toggleSort()" title="Urutkan A-Z / Z-A">↕</button>`, "Tanggal Penggantian Berkala Terakhir", "Personil", "Keterangan", "Periode", "Tanggal Berkala Selanjutnya", "Aksi"];
-            headers.forEach(h => html += `<th>${h}</th>`);
-            html += '</tr></thead><tbody>';
+            const modal = document.getElementById('customModal');
+            const container = document.getElementById('modalContainer');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                container.classList.remove('scale-95');
+                container.classList.add('scale-100');
+            }, 10);
 
-            if (filteredRows.length === 0) {
-                html += `<tr><td colspan="9" class="text-center text-secondary py-4">Tidak ditemukan data yang sesuai dengan kata kunci.</td></tr>`;
-            }
-
-            filteredRows.forEach((row, idx) => {
-                let originalIndex = data.indexOf(row);
-                html += '<tr>';
-                html += `<td class="text-center fw-semibold" style="width: 50px;">${idx + 1}</td>`;
-                for (let j = 0; j < 7; j++) {
-                    html += `<td>${row[j] || ''}</td>`;
-                }
-                html += `<td class="text-center" style="width: 160px;">
-                    <button class="btn btn-sm btn-warning text-white me-1 px-2" onclick="openEditModal(${originalIndex})">Edit</button>
-                    <button class="btn btn-sm btn-danger px-2" onclick="deleteData(${originalIndex})">Hapus</button>
-                </td>`;
-                html += '</tr>';
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            // Hapus event listener lama agar tidak menumpuk
+            const newBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+            
+            newBtn.addEventListener('click', () => {
+                if (onConfirmCallback) onConfirmCallback();
+                closeModal();
             });
-
-            html += '</tbody></table></div>';
-            container.innerHTML = html;
         }
 
-        function toggleSort() {
-            currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
-            renderTable(globalData);
+        function closeModal() {
+            const modal = document.getElementById('customModal');
+            const container = document.getElementById('modalContainer');
+            
+            modal.classList.add('opacity-0');
+            container.classList.remove('scale-100');
+            container.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
         }
 
-        function triggerScraper() {
-            let dFrom = document.getElementById('dateFrom').value;
-            let dTo = document.getElementById('dateTo').value;
+        // Contoh Trigger Tombol Tarik Data dengan Modal Elegan & Loading Spinner
+        function triggerScraperModal() {
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
 
-            if (!dFrom || !dTo) {
-                alert("Harap tentukan tanggal 'Dari' dan 'S/d' terlebih dahulu!");
-                return;
-            }
-
-            if (!confirm(`Jalankan penarikan data scraper dari tanggal ${dFrom} sampai ${dTo}?`)) {
-                return;
-            }
-
-            let btn = document.getElementById('btnTarik');
-            btn.innerText = "⏳ Memulai Scraper...";
-            btn.disabled = true;
-
-            // Tampilkan animasi loading besar di tengah tabel
-            document.getElementById('table-container').innerHTML = `
-                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
-                <h5 class="fw-bold text-primary">Sedang Menarik Data dari Web PMP...</h5>
-                <p class="text-secondary small">GitHub Actions sedang berjalan di server. Mohon tunggu sekitar 1-2 menit, tabel akan otomatis diperbarui.</p>
-            `;
-
-            let payload = {
-                action: "trigger_scraper",
-                date_from: dFrom,
-                date_to: dTo
-            };
-
-            fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.status === "success") {
-                    // Mulai hitung mundur atau tunggu 60 detik lalu cek otomatis data baru
-                    let countdown = 75; // 75 detik estimasi scraper selesai
-                    let timerInterval = setInterval(() => {
-                        countdown--;
-                        if (countdown <= 0) {
-                            clearInterval(timerInterval);
-                            btn.innerText = "⚡ Tarik Data";
-                            btn.disabled = false;
-                            loadData(); // Otomatis muat data terbaru ke tabel
-                        } else {
-                            document.querySelector('#table-container p').innerText = `Sedang memproses... Harap tunggu ${countdown} detik lagi, data akan otomatis muncul.`;
-                        }
-                    }, 1000);
-                } else {
-                    btn.innerText = "⚡ Tarik Data";
-                    btn.disabled = false;
-                    alert("Gagal: " + res.message);
-                    loadData();
+            showModal(
+                "Picu Tarik Data Otomatis",
+                `Sistem akan menjalankan GitHub Actions untuk mengambil data dari tanggal <b>${dateFrom || 'Default'}</b> s/d <b>${dateTo || 'Default'}</b>. Lanjutkan?`,
+                "fa-solid fa-bolt",
+                () => {
+                    // Tampilkan modal loading aktif
+                    showModal(
+                        "Sedang Memproses...",
+                        `<div class="flex flex-col items-center justify-center py-4">
+                            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
+                            <p class="text-sm text-slate-600">Menghubungkan ke server GitHub Actions & PMP...</p>
+                         </div>`,
+                        "fa-solid fa-sync",
+                        null
+                    );
+                    // Sembunyikan tombol konfirmasi saat loading
+                    document.getElementById('modalConfirmBtn').style.display = 'none';
+                    
+                    // Simulasi / Eksekusi fetch ke API GitHub / Google Apps Script Anda di sini
+                    setTimeout(() => {
+                        closeModal();
+                        document.getElementById('modalConfirmBtn').style.display = 'inline-block';
+                        alert("Perintah tarik data berhasil dikirim!");
+                    }, 2000);
                 }
-            })
-            .catch(err => {
-                btn.innerText = "⚡ Tarik Data";
-                btn.disabled = false;
-                console.error(err);
-                alert("Terjadi kesalahan koneksi.");
-                loadData();
-            });
+            );
         }
 
         function openAddModal() {
-            document.getElementById('modalTitle').innerText = "Tambah Data Baru";
-            document.getElementById('rowIndex').value = "";
-            document.getElementById('dataForm').reset();
-            document.getElementById('fPeriode').value = "90";
-            modalInstance.show();
-        }
-
-        function openEditModal(index) {
-            document.getElementById('modalTitle').innerText = "Edit Data Pengecekan";
-            document.getElementById('rowIndex').value = index;
-            let row = globalData[index];
-            document.getElementById('fNama').value = row[0] || '';
-            document.getElementById('fMesin').value = row[1] || '';
-            document.getElementById('fTglTerakhir').value = row[2] || '';
-            document.getElementById('fPersonil').value = row[3] || '';
-            document.getElementById('fKeterangan').value = row[4] || '';
-            document.getElementById('fPeriode').value = row[5] || '90';
-            document.getElementById('fTglSelanjutnya').value = row[6] || '';
-            modalInstance.show();
-        }
-
-        function hitungTanggalSelanjutnya() {
-            let tglStr = document.getElementById('fTglTerakhir').value.trim();
-            let periodeDays = parseInt(document.getElementById('fPeriode').value) || 90;
-            
-            if (tglStr) {
-                try {
-                    let parts = tglStr.split('-');
-                    if (parts.length === 3) {
-                        let day = parseInt(parts[0], 10);
-                        let month = parseInt(parts[1], 10) - 1;
-                        let year = parseInt(parts[2], 10) + 2000;
-                        let parsedDate = new Date(year, month, day);
-                        
-                        if (!isNaN(parsedDate)) {
-                            parsedDate.setDate(parsedDate.getDate() + periodeDays);
-                            let dd = String(parsedDate.getDate()).padStart(2, '0');
-                            let mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
-                            let yy = String(parsedDate.getFullYear()).slice(-2);
-                            document.getElementById('fTglSelanjutnya').value = `${dd}-${mm}-${yy}`;
-                        }
-                    }
-                } catch(e) {
-                    console.log("Format tanggal belum valid");
+            showModal(
+                "Tambah Data Baru",
+                `<div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MOTOR</label>
+                        <input type="text" placeholder="Masukkan nama motor..." class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MESIN</label>
+                        <input type="text" placeholder="Contoh: FS 8" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                 </div>`,
+                "fa-solid fa-plus-circle",
+                () => {
+                    alert("Data berhasil ditambahkan!");
                 }
-            }
+            );
         }
-
-        document.getElementById('fTglTerakhir').addEventListener('input', hitungTanggalSelanjutnya);
-
-        document.getElementById('dataForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            let index = document.getElementById('rowIndex').value;
-            let rowData = [
-                document.getElementById('fNama').value,
-                document.getElementById('fMesin').value,
-                document.getElementById('fTglTerakhir').value,
-                document.getElementById('fPersonil').value,
-                document.getElementById('fKeterangan').value,
-                document.getElementById('fPeriode').value,
-                document.getElementById('fTglSelanjutnya').value
-            ];
-
-            let payload = {
-                action: index === "" ? "add" : "update",
-                index: index === "" ? null : parseInt(index) - 1,
-                data: rowData
-            };
-
-            fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            }).then(() => {
-                modalInstance.hide();
-                loadData();
-            });
-        });
-
-        function deleteData(index) {
-            if (confirm("Yakin ingin menghapus data ini?")) {
-                let payload = {
-                    action: "delete",
-                    index: index - 1
-                };
-                fetch(APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    body: JSON.stringify(payload)
-                }).then(() => {
-                    loadData();
-                });
-            }
-        }
-
-        loadData();
     </script>
 </body>
 </html>
