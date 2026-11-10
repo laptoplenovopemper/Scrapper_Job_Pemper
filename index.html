@@ -86,14 +86,14 @@
                 <p class="mb-0 text-white-50 small">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
             </div>
             
-            <!-- Kontrol Filter Tanggal, Tombol Trigger Scraper via Apps Script, & Global Search -->
+            <!-- Kontrol Filter Tanggal, Tombol Trigger Scraper, & Global Search -->
             <div class="d-flex align-items-center gap-2 flex-wrap justify-content-lg-end">
                 <div class="input-group input-group-sm" style="width: auto;">
                     <span class="input-group-text bg-light text-secondary">Dari</span>
                     <input type="date" id="dateFrom" class="form-control form-control-sm">
                     <span class="input-group-text bg-light text-secondary">S/d</span>
                     <input type="date" id="dateTo" class="form-control form-control-sm">
-                    <button class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraper()" title="Jalankan Scraper Otomatis">⚡ Tarik Data</button>
+                    <button id="btnTarik" class="btn btn-warning fw-semibold text-dark px-2" onclick="triggerScraper()" title="Jalankan Scraper Otomatis">⚡ Tarik Data</button>
                 </div>
 
                 <input type="text" id="globalSearch" class="form-control form-control-sm shadow-sm" placeholder="🔍 Cari apa saja..." style="width: 180px;" oninput="renderTable(globalData)">
@@ -193,13 +193,11 @@
             let keyword = document.getElementById('globalSearch').value.toLowerCase();
             let rowsBody = data.slice(1);
 
-            // Global search untuk seluruh kata kunci di dalam tabel
             let filteredRows = rowsBody.filter(row => {
                 if (!keyword) return true;
                 return row.some(cell => String(cell).toLowerCase().includes(keyword));
             });
 
-            // Sorting interaktif berdasarkan Kolom Nama Mesin (Indeks 1)
             filteredRows.sort((a, b) => {
                 let valA = (a[1] || '').toLowerCase();
                 let valB = (b[1] || '').toLowerCase();
@@ -250,14 +248,20 @@
                 return;
             }
 
-            if (!confirm(`Jalankan penarikan data scraper otomatis dari tanggal ${dFrom} sampai ${dTo}?`)) {
+            if (!confirm(`Jalankan penarikan data scraper dari tanggal ${dFrom} sampai ${dTo}?`)) {
                 return;
             }
 
-            let btn = event.target;
-            let oldText = btn.innerText;
-            btn.innerText = "⏳ Memproses...";
+            let btn = document.getElementById('btnTarik');
+            btn.innerText = "⏳ Memulai Scraper...";
             btn.disabled = true;
+
+            // Tampilkan animasi loading besar di tengah tabel
+            document.getElementById('table-container').innerHTML = `
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status"></div>
+                <h5 class="fw-bold text-primary">Sedang Menarik Data dari Web PMP...</h5>
+                <p class="text-secondary small">GitHub Actions sedang berjalan di server. Mohon tunggu sekitar 1-2 menit, tabel akan otomatis diperbarui.</p>
+            `;
 
             let payload = {
                 action: "trigger_scraper",
@@ -271,19 +275,33 @@
             })
             .then(res => res.json())
             .then(res => {
-                btn.innerText = oldText;
-                btn.disabled = false;
                 if (res.status === "success") {
-                    alert("Berhasil! Perintah tarik data telah dikirim ke GitHub Actions melalui Google Apps Script.\nTunggu 1-2 menit lalu muat ulang halaman ini.");
+                    // Mulai hitung mundur atau tunggu 60 detik lalu cek otomatis data baru
+                    let countdown = 75; // 75 detik estimasi scraper selesai
+                    let timerInterval = setInterval(() => {
+                        countdown--;
+                        if (countdown <= 0) {
+                            clearInterval(timerInterval);
+                            btn.innerText = "⚡ Tarik Data";
+                            btn.disabled = false;
+                            loadData(); // Otomatis muat data terbaru ke tabel
+                        } else {
+                            document.querySelector('#table-container p').innerText = `Sedang memproses... Harap tunggu ${countdown} detik lagi, data akan otomatis muncul.`;
+                        }
+                    }, 1000);
                 } else {
+                    btn.innerText = "⚡ Tarik Data";
+                    btn.disabled = false;
                     alert("Gagal: " + res.message);
+                    loadData();
                 }
             })
             .catch(err => {
-                btn.innerText = oldText;
+                btn.innerText = "⚡ Tarik Data";
                 btn.disabled = false;
                 console.error(err);
                 alert("Terjadi kesalahan koneksi.");
+                loadData();
             });
         }
 
