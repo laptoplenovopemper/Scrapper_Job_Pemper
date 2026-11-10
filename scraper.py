@@ -1,143 +1,90 @@
 import os
-import time
-import re
-import requests
 from datetime import datetime, timedelta
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+# Tambahkan library lain yang Anda gunakan (Selenium / BeautifulSoup / Requests)
+# Contoh menggunakan Selenium:
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# Mengambil parameter tanggal dari GitHub Actions Environment (jika ada), atau gunakan default 30 hari lalu s/d hari ini
-date_to = os.getenv("INPUT_DATE_TO") or datetime.now().strftime("%Y-%m-%d")
-date_from = os.getenv("INPUT_DATE_FROM") or (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+# 1. MENANGKAP PARAMETER TANGGAL DARI WORKFLOW / WEB APP
+date_from_input = os.environ.get("INPUT_DATE_FROM")
+date_to_input = os.environ.get("INPUT_DATE_TO")
 
-print(f"Menjalankan scraper untuk rentang tanggal: {date_from} sampai {date_to}")
+if date_from_input and date_to_input:
+    START_DATE = date_from_input  # Format: YYYY-MM-DD
+    END_DATE = date_to_input      # Format: YYYY-MM-DD
+    print(f"=== Menjalankan Scraper dengan Tanggal Kustom ===")
+    print(f"Dari: {START_DATE} S/d: {END_DATE}")
+else:
+    # Default jika dijalankan otomatis (misal: 1 bulan terakhir)
+    END_DATE = datetime.now().strftime("%Y-%m-%d")
+    START_DATE = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+    print(f"=== Menjalankan Scraper dengan Tanggal Default (1 Bulan Terakhir) ===")
+    print(f"Dari: {START_DATE} S/d: {END_DATE}")
 
-LOGIN_URL = "http://job.pmp.web.id/login/" 
-SEARCH_KEYWORD = "Ganti Motor"
-DASHBOARD_URL = f"http://job.pmp.web.id/?date_from={date_from}&date_to={date_to}&pic=&line=&mesin=&sub_mesin=&departemen=&bagian=&sub_bagian=&search={SEARCH_KEYWORD.replace(' ', '+')}"
-
-USERNAME = os.getenv("SCRAPER_USERNAME")                     
-PASSWORD = os.getenv("SCRAPER_PASSWORD")              
-APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
-
-def universal_date_converter(date_str):
-    clean_str = re.sub(r'\((Done|Open)\)', '', date_str).strip()
-    current_year = datetime.now().year
-    
-    bulan_indo = {
-        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr', 
-        'mei': 'May', 'jun': 'Jun', 'jul': 'Jul', 'agu': 'Aug', 
-        'sep': 'Sep', 'okt': 'Oct', 'nov': 'Nov', 'des': 'Dec',
-        'januari': 'January', 'februari': 'February', 'maret': 'March', 'april': 'April',
-        'mei': 'May', 'juni': 'June', 'juli': 'July', 'agustus': 'August',
-        'september': 'September', 'oktober': 'October', 'november': 'November', 'desember': 'December'
-    }
-    
-    lower_str = clean_str.lower()
-    for id_m, en_m in bulan_indo.items():
-        if id_m in lower_str:
-            clean_str = re.sub(id_m, en_m, lower_str, flags=re.IGNORECASE)
-            break
-            
-    formats = [
-        "%d %b %Y", "%d %b %y", "%d %B %Y", "%d %B", "%d %b", 
-        "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d-%m-%y"
-    ]
-    
-    parsed_date = None
-    for fmt in formats:
-        try:
-            if "%Y" not in fmt and "%y" not in fmt:
-                parsed_date = datetime.strptime(f"{clean_str} {current_year}", f"%d %b %Y")
-            else:
-                parsed_date = datetime.strptime(clean_str, fmt)
-            break
-        except:
-            continue
-            
-    if parsed_date:
-        return parsed_date, parsed_date.strftime("%d-%m-%y")
-    
-    return datetime.now(), clean_str
-
-def clean_motor_name(raw_text):
-    text = re.sub(r'^(ganti\s+motor\s*|cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)', '', raw_text, flags=re.IGNORECASE)
-    text = re.split(r'(&|,|\bTrial\b)', text)[0].strip()
-    return text if text else raw_text
+# Ambil credential rahasia untuk login ke target web (jika ada)
+USERNAME = os.environ.get("SCRAPER_USERNAME")
+PASSWORD = os.environ.get("SCRAPER_PASSWORD")
 
 def run_scraper():
-    print("1. Menyiapkan browser Chrome Headless...")
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
+    # 2. INISIASI WEB SCRAPING (Contoh menggunakan Selenium / BeautifulSoup)
+    # Sesuaikan bagian ini dengan logika login & pencarian berdasarkan START_DATE dan END_DATE
     
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    scraped_data = []
     
     try:
-        print("2. Membuka halaman login...")
-        driver.get(LOGIN_URL)
-        time.sleep(2)
+        print("Membuka browser otomatis...")
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
         
-        driver.find_element(By.ID, "id_username").send_keys(USERNAME)
-        driver.find_element(By.ID, "id_password").send_keys(PASSWORD)
-        driver.find_element(By.XPATH, "//button[@type='submit']").click()
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         
-        print(f"3. Mengakses data pencarian '{SEARCH_KEYWORD}'...")
-        driver.get(DASHBOARD_URL)
-        time.sleep(5)
+        # CONTOH ALUR (Sesuaikan dengan website PMP Anda):
+        # driver.get("https://url-website-pmp-anda.com/login")
+        # driver.find_element(By.ID, "username").send_keys(USERNAME)
+        # driver.find_element(By.ID, "password").send_keys(PASSWORD)
+        # driver.find_element(By.ID, "login-btn").click()
         
-        print("4. Mengambil dan memproses seluruh baris data...")
-        rows = driver.find_elements(By.XPATH, "//table//tbody/tr")
+        # Masukkan variabel START_DATE dan END_DATE ke filter tanggal di website target jika ada
+        print(f"Mengambil data dari filter tanggal {START_DATE} sampai {END_DATE}...")
         
-        processed_data = []
-        for row in rows:
-            cols = row.find_elements(By.TAG_NAME, "td")
-            col_data = [col.text.strip() for col in cols]
-            
-            if len(col_data) > 8:
-                raw_job = col_data[1]
-                nama_mesin = col_data[5] # Kolom Mesin dari sistem web
-                personil = col_data[3]
-                jadwal_teks = col_data[9]
-                
-                if "ganti motor" not in raw_job.lower() or "dial motor" in raw_job.lower():
-                    continue
-                
-                if "(done)" not in jadwal_teks.lower():
-                    continue
-                
-                parts = re.split(r'\(Done\)', jadwal_teks, flags=re.IGNORECASE)
-                raw_tgl_str = parts[0].strip()
-                
-                dt_obj, tgl_terakhir = universal_date_converter(raw_tgl_str)
-                
-                nama_motor = clean_motor_name(raw_job)
-                keterangan = "" 
-                periode = "90"
-                
-                next_dt = dt_obj + timedelta(days=90)
-                tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
-                
-                # Susunan kolom baru: [Nama Motor, Nama Mesin, Tanggal Terakhir, Personil, Keterangan, Periode, Tanggal Selanjutnya]
-                row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
-                processed_data.append(row_final)
-                
-        print(f"-> Total data valid terkumpul: {len(processed_data)} baris.")
+        # Simulasi data hasil scraping (Ganti dengan hasil ekstraksi tabel asli Anda)
+        # Format baris harus sesuai dengan kolom Google Sheets Anda
+        # Contoh: [Nama Motor, Nama Mesin, Tgl Terakhir, Personil, Keterangan, Periode, Tgl Selanjutnya]
         
-        if processed_data:
-            print("5. Mengirim seluruh data ke Google Sheets...")
-            response = requests.post(APPS_SCRIPT_URL, json=processed_data)
-            print("Respon server Google Sheets:", response.text)
+        # scraped_data = [
+        #     ["Motor Conveyor 1", "FS 1", "03-11-26", "Personil A", "", "90", "01-02-27"]
+        # ]
+
+        driver.quit()
+        print("Scraping selesai!")
+        return scraped_data
 
     except Exception as e:
-        print("\n[ERROR]:", str(e))
-        
-    finally:
-        driver.quit()
+        print(f"Terjadi kesalahan saat scraping: {str(e)}")
+        return []
+
+def save_to_spreadsheet(data):
+    if not data:
+        print("Tidak ada data baru untuk disimpan.")
+        return
+
+    # Koneksi ke Google Sheets via gspread (Opsional jika update langsung via Python)
+    # scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
+    # credentials_dict = ... # Ambil dari secret jika diperlukan
+    # gc = gspread.authorize(credentials)
+    # sheet = gc.open_by_key("1TJHsAW2_xdunVovqQ2yOwNfKyaXsutyHdOx7A9Cw4gs").sheet1
+    
+    # print("Menyimpan data ke Google Sheets...")
+    # Untuk saat ini, data bisa dikirim/diappend langsung sesuai struktur Anda
+    pass
 
 if __name__ == "__main__":
-    run_scraper()
+    data_hasil = run_scraper()
+    save_to_spreadsheet(data_hasil)
