@@ -25,7 +25,7 @@
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
-    <!-- TOP NAVIGATION BAR (Sesuai asli: Judul Benar, Tanpa Sapaan Nama) -->
+    <!-- TOP NAVIGATION BAR -->
     <header class="bg-pmpDark text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="flex items-center space-x-3">
@@ -74,7 +74,7 @@
             </div>
         </div>
 
-        <!-- TABEL DATA (Tema PMP: Header Gelap & Striping Rapi) -->
+        <!-- TABEL DATA -->
         <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse" id="dataTable">
@@ -103,9 +103,9 @@
         </div>
     </main>
 
-    <!-- MODAL POP-UP ELEGAN (Custom Modern Style) -->
+    <!-- MODAL POP-UP ELEGAN -->
     <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform scale-95 transition-transform duration-300" id="modalContainer">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300" id="modalContainer">
             <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
                 <h3 id="modalTitle" class="font-bold text-base flex items-center gap-2">
                     <i class="fa-solid fa-circle-info text-pmpAccent"></i> Konfirmasi Aksi
@@ -114,8 +114,8 @@
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
-            <div class="p-6 text-slate-600" id="modalBody">
-                <p id="modalMessage">Apakah Anda yakin ingin memicu proses tarik data?</p>
+            <div class="p-6 text-slate-600 max-h-[75vh] overflow-y-auto" id="modalBody">
+                <!-- Konten dinamis modal -->
             </div>
             <div class="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100" id="modalFooter">
                 <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">Batal</button>
@@ -124,68 +124,69 @@
         </div>
     </div>
 
-    <!-- SCRIPT FUNGSI UTAMA & INTERAKSI -->
+    <!-- SCRIPT -->
     <script>
-        // Masukkan URL Web App Google Apps Script Anda di sini untuk menarik data asli
-        const APPS_SCRIPT_GET_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+        let globalData = [];
 
-        // Fungsi Load Data Asli dari Google Sheets / Web App
         async function loadData() {
             try {
-                const response = await fetch(APPS_SCRIPT_GET_URL);
+                const response = await fetch(APPS_SCRIPT_URL);
                 const result = await response.json();
                 
                 const tbody = document.getElementById('tableBody');
                 tbody.innerHTML = '';
 
-                if (!result || result.length === 0) {
+                if (!result || result.length <= 1) {
                     tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">Tidak ada data ditemukan.</td></tr>`;
                     return;
                 }
 
-                result.forEach((row, index) => {
-                    // Pastikan struktur sesuai urutan kolom Anda
-                    let tr = document.createElement('tr');
-                    tr.className = "hover:bg-slate-50 transition";
-                    tr.innerHTML = `
-                        <td class="py-3 px-4 text-center font-medium text-slate-500">${index + 1}</td>
-                        <td class="py-3 px-4 font-semibold text-slate-700">${row[0] || '-'}</td>
-                        <td class="py-3 px-4"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">${row[1] || '-'}</span></td>
-                        <td class="py-3 px-4 text-slate-600">${row[2] || '-'}</td>
-                        <td class="py-3 px-4 text-slate-600">${row[3] || '-'}</td>
-                        <td class="py-3 px-4 text-slate-500">${row[4] || '-'}</td>
-                        <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${row[5] || '90'} Hari</span></td>
-                        <td class="py-3 px-4 font-medium text-emerald-600">${row[6] || '-'}</td>
-                        <td class="py-3 px-4 text-center space-x-1">
-                            <button onclick="editData(${index})" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
-                            <button onclick="deleteData(${index})" class="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-trash"></i></button>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+                globalData = result.slice(1); // Simpan data global (mengecualikan header)
+                renderTable(globalData);
+
             } catch (error) {
                 console.error("Gagal memuat data:", error);
                 document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="text-center py-6 text-rose-500">Gagal memuat data dari server.</td></tr>`;
             }
         }
 
-        // Jalankan saat halaman dibuka
-        window.onload = loadData;
+        function renderTable(data) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
 
-        // Fitur Pencarian Tabel
-        function filterTable() {
-            let input = document.getElementById('searchInput').value.toLowerCase();
-            let rows = document.querySelectorAll('#tableBody tr');
-            rows.forEach(row => {
-                let text = row.innerText.toLowerCase();
-                row.style.display = text.includes(input) ? '' : 'none';
+            data.forEach((row, index) => {
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-center font-medium text-slate-500">${index + 1}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-700">${row[0] || '-'}</td>
+                    <td class="py-3 px-4"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">${row[1] || '-'}</span></td>
+                    <td class="py-3 px-4 text-slate-600">${row[2] || '-'}</td>
+                    <td class="py-3 px-4 text-slate-600">${row[3] || '-'}</td>
+                    <td class="py-3 px-4 text-slate-500">${row[4] || '-'}</td>
+                    <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${row[5] || '90'} Hari</span></td>
+                    <td class="py-3 px-4 font-medium text-emerald-600">${row[6] || '-'}</td>
+                    <td class="py-3 px-4 text-center space-x-1">
+                        <button onclick="openEditModal(${index})" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteData(${index})" class="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
             });
         }
 
-        // Pengaturan Modal Elegan
-        function showModal(title, message, iconClass, onConfirmCallback, showFooter = true) {
+        window.onload = loadData;
+
+        function filterTable() {
+            let input = document.getElementById('searchInput').value.toLowerCase();
+            let filtered = globalData.filter(row => row.some(cell => String(cell).toLowerCase().includes(input)));
+            renderTable(filtered);
+        }
+
+        function showModal(title, messageHtml, iconClass, onConfirmCallback, showFooter = true) {
             document.getElementById('modalTitle').innerHTML = `<i class="${iconClass} text-sky-400 mr-2"></i> ${title}`;
-            document.getElementById('modalMessage').innerHTML = message;
+            document.getElementById('modalBody').innerHTML = messageHtml;
             document.getElementById('modalFooter').style.display = showFooter ? 'flex' : 'none';
             
             const modal = document.getElementById('customModal');
@@ -204,7 +205,6 @@
                 confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
                 newBtn.addEventListener('click', () => {
                     onConfirmCallback();
-                    closeModal();
                 });
             }
         }
@@ -220,63 +220,167 @@
             setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
 
+        // --- FORM TAMBAH DATA BARU ---
+        function openAddModal() {
+            const today = new Date().toISOString().split('T')[0];
+            const htmlForm = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MOTOR</label>
+                        <input type="text" id="inputMotor" placeholder="Masukkan nama motor..." class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MESIN</label>
+                        <input type="text" id="inputMesin" placeholder="Contoh: FS 8" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">TANGGAL PENGGANTIAN</label>
+                        <input type="date" id="inputTanggal" value="${today}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">PERSONIL</label>
+                        <input type="text" id="inputPersonil" placeholder="Nama personil..." class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">KETERANGAN</label>
+                        <textarea id="inputKeterangan" placeholder="Keterangan tambahan (opsional)..." class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500" rows="2"></textarea>
+                    </div>
+                </div>
+            `;
+
+            showModal("Tambah Data Baru", htmlForm, "fa-solid fa-plus-circle", () => {
+                const motor = document.getElementById('inputMotor').value.trim();
+                const mesin = document.getElementById('inputMesin').value.trim();
+                const tglInput = document.getElementById('inputTanggal').value;
+                const personil = document.getElementById('inputPersonil').value.trim();
+                const ket = document.getElementById('inputKeterangan').value.trim();
+
+                if (!motor || !mesin || !tglInput || !personil) {
+                    alert("Harap isi semua kolom wajib (Motor, Mesin, Tanggal, Personil)!");
+                    return;
+                }
+
+                // Format Tanggal Terakhir (DD-MM-YY)
+                const dObj = new Date(tglInput);
+                const day = String(dObj.getDate()).padStart(2, '0');
+                const month = String(dObj.getMonth() + 1).padStart(2, '0');
+                const year = String(dObj.getFullYear()).slice(-2);
+                const tglTerakhir = `${day}-${month}-${year}`;
+
+                // Hitung Tanggal Selanjutnya (+90 hari otomatis)
+                dObj.setDate(dObj.getDate() + 90);
+                const nextDay = String(dObj.getDate()).padStart(2, '0');
+                const nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
+                const nextYear = String(dObj.getFullYear()).slice(-2);
+                const tglSelanjutnya = `${nextDay}-${nextMonth}-${nextYear}`;
+
+                const newData = [motor, mesin, tglTerakhir, personil, ket || "-", "90", tglSelanjutnya];
+
+                // Kirim ke Apps Script (Mode POST untuk Tambah)
+                submitToServer({ action: "add", data: newData });
+            });
+        }
+
+        // --- FORM EDIT DATA ---
+        function openEditModal(index) {
+            const row = globalData[index];
+            // Konversi format tanggal kembali ke YYYY-MM-DD untuk input date HTML
+            let parts = row[2] ? row[2].split('-') : [];
+            let formattedDate = new Date().toISOString().split('T')[0];
+            if(parts.length === 3) {
+                formattedDate = `20${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+
+            const htmlForm = `
+                <div class="space-y-4">
+                    <input type="hidden" id="editIndex" value="${index}">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MOTOR</label>
+                        <input type="text" id="editMotor" value="${row[0] || ''}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MESIN</label>
+                        <input type="text" id="editMesin" value="${row[1] || ''}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">TANGGAL PENGGANTIAN</label>
+                        <input type="date" id="editTanggal" value="${formattedDate}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">PERSONIL</label>
+                        <input type="text" id="editPersonil" value="${row[3] || ''}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">KETERANGAN</label>
+                        <textarea id="editKeterangan" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500" rows="2">${row[4] === '-' ? '' : row[4]}</textarea>
+                    </div>
+                </div>
+            `;
+
+            showModal("Edit Data Pekerjaan", htmlForm, "fa-solid fa-pen-to-square", () => {
+                const idx = document.getElementById('editIndex').value;
+                const motor = document.getElementById('editMotor').value.trim();
+                const mesin = document.getElementById('editMesin').value.trim();
+                const tglInput = document.getElementById('editTanggal').value;
+                const personil = document.getElementById('editPersonil').value.trim();
+                const ket = document.getElementById('editKeterangan').value.trim();
+
+                const dObj = new Date(tglInput);
+                const day = String(dObj.getDate()).padStart(2, '0');
+                const month = String(dObj.getMonth() + 1).padStart(2, '0');
+                const year = String(dObj.getFullYear()).slice(-2);
+                const tglTerakhir = `${day}-${month}-${year}`;
+
+                dObj.setDate(dObj.getDate() + 90);
+                const nextDay = String(dObj.getDate()).padStart(2, '0');
+                const nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
+                const nextYear = String(dObj.getFullYear()).slice(-2);
+                const tglSelanjutnya = `${nextDay}-${nextMonth}-${nextYear}`;
+
+                const updatedData = [motor, mesin, tglTerakhir, personil, ket || "-", "90", tglSelanjutnya];
+
+                submitToServer({ action: "edit", index: parseInt(idx) + 1, data: updatedData });
+            });
+        }
+
+        // --- HAPUS DATA ---
+        function deleteData(index) {
+            if (confirm("Apakah Anda yakin ingin menghapus data ini?")) {
+                submitToServer({ action: "delete", index: index + 1 });
+            }
+        }
+
+        // --- FUNGSI KIRIM KE SERVER APPS SCRIPT ---
+        async function submitToServer(payload) {
+            showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menyimpan perubahan ke server...</p></div>`, "fa-solid fa-sync", null, false);
+            
+            try {
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                });
+                const resText = await response.text();
+                closeModal();
+                alert("Berhasil: " + resText);
+                loadData(); // Muat ulang tabel
+            } catch (err) {
+                closeModal();
+                alert("Terjadi kesalahan koneksi ke server.");
+                console.error(err);
+            }
+        }
+
         function triggerScraperModal() {
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
-            showModal(
-                "Picu Tarik Data Otomatis",
-                `Sistem akan menjalankan GitHub Actions untuk mengambil data dari tanggal <b>${dateFrom || 'Default'}</b> s/d <b>${dateTo || 'Default'}</b>. Lanjutkan?`,
-                "fa-solid fa-bolt",
-                () => {
-                    showModal(
-                        "Sedang Memproses...",
-                        `<div class="flex flex-col items-center justify-center py-4">
-                            <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
-                            <p class="text-sm text-slate-600">Menghubungkan ke server GitHub Actions...</p>
-                         </div>`,
-                        "fa-solid fa-sync",
-                        null,
-                        false
-                    );
-                    
-                    // Trigger dispatch ke GitHub Actions / Web App Anda
-                    setTimeout(() => {
-                        closeModal();
-                        alert("Perintah tarik data berhasil dikirim!");
-                    }, 2000);
-                }
-            );
-        }
-
-        function openAddModal() {
-            showModal(
-                "Tambah Data Baru",
-                `<div class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MOTOR</label>
-                        <input type="text" id="addMotor" placeholder="Masukkan nama motor..." class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MESIN</label>
-                        <input type="text" id="addMesin" placeholder="Contoh: FS 8" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-                 </div>`,
-                "fa-solid fa-plus-circle",
-                () => {
-                    alert("Fitur simpan data manual aktif.");
-                }
-            );
-        }
-
-        function editData(index) {
-            alert("Edit baris ke-" + (index + 1));
-        }
-
-        function deleteData(index) {
-            if(confirm("Yakin ingin menghapus data ini?")) {
-                alert("Data baris ke-" + (index + 1) + " dihapus.");
-            }
+            showModal("Picu Tarik Data Otomatis", `Sistem akan menjalankan GitHub Actions untuk mengambil data dari tanggal <b>${dateFrom || 'Default'}</b> s/d <b>${dateTo || 'Default'}</b>. Lanjutkan?`, "fa-solid fa-bolt", () => {
+                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghubungkan ke server GitHub Actions...</p></div>`, "fa-solid fa-sync", null, false);
+                setTimeout(() => {
+                    closeModal();
+                    alert("Perintah tarik data berhasil dikirim!");
+                }, 2000);
+            });
         }
     </script>
 </body>
