@@ -87,7 +87,6 @@
                             <th class="py-3 px-4">Personil</th>
                             <th class="py-3 px-4">Keterangan</th>
                             <th class="py-3 px-4 text-center">Periode</th>
-                            <!-- Kolom dengan Fitur Sort -->
                             <th class="py-3 px-4 cursor-pointer hover:bg-slate-700 transition select-none" onclick="toggleSortDate()">
                                 Tanggal Berkala Selanjutnya <i id="sortIcon" class="fa-solid fa-sort ml-1 text-slate-400"></i>
                             </th>
@@ -106,7 +105,7 @@
         </div>
     </main>
 
-    <!-- MODAL POP-UP ELEGAN -->
+    <!-- MODAL POP-UP ELEGAN (SERAGAM) -->
     <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300" id="modalContainer">
             <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
@@ -117,9 +116,7 @@
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
-            <div class="p-6 text-slate-600 max-h-[75vh] overflow-y-auto" id="modalBody">
-                <!-- Konten dinamis modal -->
-            </div>
+            <div class="p-6 text-slate-600 max-h-[75vh] overflow-y-auto" id="modalBody"></div>
             <div class="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100" id="modalFooter">
                 <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">Batal</button>
                 <button id="modalConfirmBtn" class="px-4 py-2 bg-pmpAccent hover:bg-pmpHover text-white font-medium rounded-lg text-sm transition shadow-sm">Ya, Lanjutkan</button>
@@ -131,7 +128,7 @@
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
         let globalData = [];
-        let sortAscending = true; // Status sorting tanggal berikutnya
+        let sortAscending = true;
 
         async function loadData() {
             try {
@@ -146,7 +143,7 @@
                     return;
                 }
 
-                globalData = result.slice(1); // Simpan data (tanpa header sheets)
+                globalData = result.slice(1);
                 renderTable(globalData);
 
             } catch (error) {
@@ -182,7 +179,6 @@
 
         window.onload = loadData;
 
-        // --- FITUR SORTING BERDASARKAN TANGGAL BERKALA SELANJUTNYA ---
         function toggleSortDate() {
             sortAscending = !sortAscending;
             const sortIcon = document.getElementById('sortIcon');
@@ -199,7 +195,7 @@
 
         function parseLocalDate(dateStr) {
             if (!dateStr) return new Date(0);
-            let parts = dateStr.split('-'); // Format DD-MM-YY
+            let parts = dateStr.split('-');
             if (parts.length === 3) {
                 return new Date(`20${parts[2]}`, parts[1] - 1, parts[0]);
             }
@@ -251,7 +247,21 @@
             setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
 
-        // --- FORM TAMBAH DATA BARU ---
+        // --- MODAL NOTIFIKASI SERAGAM ---
+        function showNotification(title, message, isSuccess = true) {
+            const icon = isSuccess ? "fa-solid fa-circle-check text-emerald-500" : "fa-solid fa-circle-exclamation text-rose-500";
+            const html = `
+                <div class="text-center py-3">
+                    <i class="${icon} text-4xl mb-3"></i>
+                    <p class="text-slate-800 font-semibold text-base">${message}</p>
+                </div>
+            `;
+            showModal(title, html, isSuccess ? "fa-solid fa-check" : "fa-solid fa-triangle-exclamation", () => {
+                closeModal();
+            }, true, "Tutup", isSuccess ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700");
+        }
+
+        // --- TAMBAH DATA ---
         function openAddModal() {
             const today = new Date().toISOString().split('T')[0];
             const htmlForm = `
@@ -287,7 +297,7 @@
                 const ket = document.getElementById('inputKeterangan').value.trim();
 
                 if (!motor || !mesin || !tglInput || !personil) {
-                    alert("Harap isi semua kolom wajib (Motor, Mesin, Tanggal, Personil)!");
+                    showNotification("Peringatan", "Harap isi semua kolom wajib!", false);
                     return;
                 }
 
@@ -304,11 +314,11 @@
                 const tglSelanjutnya = `${nextDay}-${nextMonth}-${nextYear}`;
 
                 const newData = [motor, mesin, tglTerakhir, personil, ket || "-", "90", tglSelanjutnya];
-                submitToServer({ action: "add", data: newData });
+                submitToServer({ action: "add", data: newData }, "Data berhasil ditambahkan!");
             }, true, "Simpan Data", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // --- FORM EDIT DATA (Lengkap dengan Periode) ---
+        // --- EDIT DATA (Memperbaiki Tanggal Terakhir agar Tetap Sesuai Asli, Hanya Tanggal Selanjutnya yang Berubah) ---
         function openEditModal(index) {
             const row = globalData[index];
             let parts = row[2] ? row[2].split('-') : [];
@@ -317,10 +327,13 @@
                 formattedDate = `20${parts[2]}-${parts[1]}-${parts[0]}`;
             }
             let currentPeriode = row[5] || '90';
+            // Tanggal Terakhir Asli disimpan di variabel tersembunyi/tetap
+            let originalTglTerakhir = row[2];
 
             const htmlForm = `
                 <div class="space-y-4">
                     <input type="hidden" id="editIndex" value="${index}">
+                    <input type="hidden" id="origTgl" value="${originalTglTerakhir}">
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1">NAMA MOTOR</label>
                         <input type="text" id="editMotor" value="${row[0] || ''}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
@@ -330,8 +343,8 @@
                         <input type="text" id="editMesin" value="${row[1] || ''}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">TANGGAL PENGGANTIAN</label>
-                        <input type="date" id="editTanggal" value="${formattedDate}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">TANGGAL PENGGANTIAN TERAKHIR <span class="text-xs text-slate-400 font-normal">(Tetap)</span></label>
+                        <input type="date" id="editTanggal" value="${formattedDate}" class="w-full px-3 py-2 border rounded-md text-sm bg-slate-100 text-slate-500 cursor-not-allowed" disabled>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1">PERIODE (HARI)</label>
@@ -352,18 +365,14 @@
                 const idx = document.getElementById('editIndex').value;
                 const motor = document.getElementById('editMotor').value.trim();
                 const mesin = document.getElementById('editMesin').value.trim();
-                const tglInput = document.getElementById('editTanggal').value;
+                const tglTerakhir = document.getElementById('origTgl').value; // Tanggal penggantian tetap dipertahankan
+                const tglInputBase = document.getElementById('editTanggal').value;
                 const periodeVal = parseInt(document.getElementById('editPeriode').value) || 90;
                 const personil = document.getElementById('editPersonil').value.trim();
                 const ket = document.getElementById('editKeterangan').value.trim();
 
-                const dObj = new Date(tglInput);
-                const day = String(dObj.getDate()).padStart(2, '0');
-                const month = String(dObj.getMonth() + 1).padStart(2, '0');
-                const year = String(dObj.getFullYear()).slice(-2);
-                const tglTerakhir = `${day}-${month}-${year}`;
-
-                // Hitung otomatis berdasarkan periode yang diisi
+                // Hitung Tanggal Selanjutnya berdasarkan Tanggal Terakhir Asli + Periode Baru
+                const dObj = new Date(tglInputBase);
                 dObj.setDate(dObj.getDate() + periodeVal);
                 const nextDay = String(dObj.getDate()).padStart(2, '0');
                 const nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
@@ -372,11 +381,11 @@
 
                 const updatedData = [motor, mesin, tglTerakhir, personil, ket || "-", String(periodeVal), tglSelanjutnya];
 
-                submitToServer({ action: "edit", index: parseInt(idx) + 1, data: updatedData });
+                submitToServer({ action: "edit", index: parseInt(idx) + 1, data: updatedData }, "Data berhasil diperbarui!");
             }, true, "Simpan Perubahan", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // --- MODAL POP-UP HAPUS (Diseragamkan) ---
+        // --- HAPUS DATA ---
         function openDeleteModal(index) {
             const row = globalData[index];
             const messageHtml = `
@@ -389,12 +398,11 @@
             `;
 
             showModal("Konfirmasi Hapus Data", messageHtml, "fa-solid fa-trash-can", () => {
-                submitToServer({ action: "delete", index: index + 1 });
+                submitToServer({ action: "delete", index: index + 1 }, "Data berhasil dihapus!");
             }, true, "Ya, Hapus", "bg-rose-500 hover:bg-rose-600");
         }
 
-        // --- FUNGSI KIRIM KE SERVER APPS SCRIPT ---
-        async function submitToServer(payload) {
+        async function submitToServer(payload, successMessage) {
             showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menyimpan perubahan ke server...</p></div>`, "fa-solid fa-sync", null, false);
             
             try {
@@ -404,27 +412,42 @@
                 });
                 const resText = await response.text();
                 closeModal();
-                alert(resText);
-                loadData(); // Muat ulang tabel
+                showNotification("Berhasil", successMessage || resText, true);
+                loadData();
             } catch (err) {
                 closeModal();
-                alert("Terjadi kesalahan koneksi ke server.");
+                showNotification("Gagal", "Terjadi kesalahan koneksi ke server.", false);
                 console.error(err);
             }
         }
 
-        // --- TRIGGER SCRAPER GITHUB ACTIONS ---
+        // --- TRIGGER SCRAPER DENGAN AUTO REFRESH (POLGING OTOMATIS) ---
         function triggerScraperModal() {
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
             showModal("Picu Tarik Data Otomatis", `Sistem akan menjalankan GitHub Actions untuk mengambil data dari tanggal <b>${dateFrom || 'Default'}</b> s/d <b>${dateTo || 'Default'}</b>. Lanjutkan?`, "fa-solid fa-bolt", () => {
-                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghubungkan ke GitHub Actions...</p></div>`, "fa-solid fa-sync", null, false);
+                showModal("Sedang Menproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Memicu GitHub Actions & memperbarui data...</p></div>`, "fa-solid fa-sync", null, false);
                 
-                submitToServer({ 
-                    action: "trigger_scraper", 
-                    date_from: dateFrom, 
-                    date_to: dateTo 
+                fetch(APPS_SCRIPT_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ 
+                        action: "trigger_scraper", 
+                        date_from: dateFrom, 
+                        date_to: dateTo 
+                    })
+                })
+                .then(res => res.text())
+                .then(resText => {
+                    // Beri waktu jeda 12 detik agar GitHub Actions sempat berjalan, lalu auto refresh tabel
+                    setTimeout(() => {
+                        loadData();
+                        showNotification("Berhasil", "Scraper selesai! Data terbaru telah dimuat otomatis.", true);
+                    }, 12000);
+                })
+                .catch(err => {
+                    closeModal();
+                    showNotification("Gagal", "Gagal memicu scraper.", false);
                 });
             }, true, "Ya, Lanjutkan", "bg-amber-500 hover:bg-amber-600");
         }
