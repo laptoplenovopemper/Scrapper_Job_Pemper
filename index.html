@@ -437,13 +437,14 @@
             }
         }
 
-        // --- TRIGGER SCRAPER DENGAN AUTO REFRESH ---
+        // --- TRIGGER SCRAPER DENGAN POLLING STATUS REAL-TIME GITHUB ACTIONS ---
         function triggerScraperModal() {
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
             showModal("Picu Tarik Data Otomatis", `Sistem akan menjalankan GitHub Actions untuk mengambil data dari tanggal <b>${dateFrom || 'Default'}</b> s/d <b>${dateTo || 'Default'}</b>. Lanjutkan?`, "fa-solid fa-bolt", () => {
-                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Memicu GitHub Actions & memperbarui data...</p></div>`, "fa-solid fa-sync", null, false);
+                
+                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600" id="loadingText">Memicu GitHub Actions...</p></div>`, "fa-solid fa-sync", null, false);
                 
                 fetch(APPS_SCRIPT_URL, {
                     method: "POST",
@@ -455,16 +456,53 @@
                 })
                 .then(res => res.text())
                 .then(resText => {
-                    setTimeout(() => {
-                        loadData();
-                        showNotification("Berhasil", "Scraper selesai! Data terbaru telah dimuat otomatis.", true);
-                    }, 12000);
+                    document.getElementById('loadingText').innerText = "Scraper dipicu! Memantau proses GitHub Actions...";
+                    checkGitHubActionStatus();
                 })
                 .catch(err => {
                     closeModal();
                     showNotification("Gagal", "Gagal memicu scraper.", false);
                 });
             }, true, "Ya, Lanjutkan", "bg-amber-500 hover:bg-amber-600");
+        }
+
+        // Fungsi Memantau Status GitHub Actions Sampai Selesai
+        function checkGitHubActionStatus() {
+            const repoOwner = "laptoplenovopemper";
+            const repoName = "Scrapper_Job_Pemper";
+            const runsUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs?per_page=1`;
+
+            const pollInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(runsUrl, {
+                        headers: { "Accept": "application/vnd.github+json" }
+                    });
+                    const data = await response.json();
+                    
+                    if (data.workflow_runs && data.workflow_runs.length > 0) {
+                        const latestRun = data.workflow_runs[0];
+                        const status = latestRun.status;
+                        const conclusion = latestRun.conclusion;
+
+                        const statusText = status === "in_progress" ? "Sedang Mengambil Data Web PMP" : status;
+                        document.getElementById('loadingText').innerText = `Proses Server: ${statusText}...`;
+
+                        if (status === "completed") {
+                            clearInterval(pollInterval);
+                            closeModal();
+                            
+                            if (conclusion === "success") {
+                                loadData();
+                                showNotification("Berhasil", "Scraper selesai dan data terbaru telah dimuat!", true);
+                            } else {
+                                showNotification("Perhatian", `Scraper selesai dengan status: ${conclusion}`, false);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Gagal mengecek status GitHub:", e);
+                }
+            }, 5000); // Polling status setiap 5 detik
         }
     </script>
 </body>
