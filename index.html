@@ -37,6 +37,12 @@
                     <p class="text-xs text-slate-300">Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya</p>
                 </div>
             </div>
+            <!-- Tombol Navigasi ke Halaman History -->
+            <div>
+                <a href="history.html" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Lihat History Motor
+                </a>
+            </div>
         </div>
     </header>
 
@@ -58,7 +64,6 @@
                 <button onclick="triggerScraperModal()" class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm">
                     <i class="fa-solid fa-bolt mr-2"></i> Tarik Data
                 </button>
-                <!-- TOMBOL SIMPAN KE DATABASE BULANAN -->
                 <button onclick="triggerSaveDatabaseModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm">
                     <i class="fa-solid fa-floppy-disk mr-2"></i> Simpan ke Database
                 </button>
@@ -264,7 +269,6 @@
             }, true, "Tutup", isSuccess ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700");
         }
 
-        // --- AKSI SIMPAN KE DATABASE BULANAN ---
         function triggerSaveDatabaseModal() {
             const messageHtml = `
                 <div class="text-center py-2">
@@ -279,7 +283,6 @@
             }, true, "Ya, Simpan", "bg-emerald-600 hover:bg-emerald-700");
         }
 
-        // --- TAMBAH DATA ---
         function openAddModal() {
             const today = new Date().toISOString().split('T')[0];
             const htmlForm = `
@@ -336,7 +339,6 @@
             }, true, "Simpan Data", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // --- EDIT DATA ---
         function openEditModal(index) {
             const row = globalData[index];
             let parts = row[2] ? row[2].split('-') : [];
@@ -401,7 +403,6 @@
             }, true, "Simpan Perubahan", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // --- HAPUS DATA ---
         function openDeleteModal(index) {
             const row = globalData[index];
             const messageHtml = `
@@ -437,7 +438,6 @@
             }
         }
 
-        // --- TRIGGER SCRAPER DENGAN POLLING STATUS REAL-TIME GITHUB ACTIONS ---
         function triggerScraperModal() {
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
@@ -466,7 +466,6 @@
             }, true, "Ya, Lanjutkan", "bg-amber-500 hover:bg-amber-600");
         }
 
-        // Fungsi Memantau Status GitHub Actions Sampai Selesai
         function checkGitHubActionStatus() {
             const repoOwner = "laptoplenovopemper";
             const repoName = "Scrapper_Job_Pemper";
@@ -502,7 +501,7 @@
                 } catch (e) {
                     console.error("Gagal mengecek status GitHub:", e);
                 }
-            }, 5000); // Polling status setiap 5 detik
+            }, 5000);
         }
     </script>
 </body>
