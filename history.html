@@ -87,7 +87,7 @@
         </div>
     </main>
 
-    <!-- MODAL POP-UP -->
+    <!-- MODAL POP-UP ELEGAN (SERAGAM) -->
     <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300" id="modalContainer">
             <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
@@ -198,48 +198,48 @@
             if (!motorObj) return;
 
             let recordsHtml = motorObj.records.map((rec, idx) => `
-                <div class="p-3 bg-slate-50 border rounded-lg mb-3 space-y-2">
+                <div class="record-item p-3 bg-slate-50 border rounded-lg mb-3 space-y-2" data-sheet="${rec.sheetName}" data-row="${rec.rowIndex}">
                     <div class="flex justify-between items-center text-xs text-slate-500 font-semibold">
-                        <span>Bulan: ${rec.sheetName} | Tgl Terakhir: <b id="tglOrig_${idx}">${rec.tglPenggantian}</b></span>
-                        <button onclick="deleteHistoryRow('${rec.sheetName}', ${rec.rowIndex})" class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-0.5 rounded text-xs transition"><i class="fa-solid fa-trash mr-1"></i> Hapus</button>
+                        <span>Bulan: ${rec.sheetName} | Tgl Terakhir: <span class="tgl-orig">${rec.tglPenggantian}</span></span>
+                        <button type="button" onclick="confirmDeleteHistoryRow('${rec.sheetName}', ${rec.rowIndex})" class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-0.5 rounded text-xs transition"><i class="fa-solid fa-trash mr-1"></i> Hapus</button>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-400 mb-1">JENIS PEKERJAAN</label>
-                            <select id="ket_${idx}" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
+                            <select class="ket-input w-full px-2 py-1.5 border rounded text-xs bg-white">
                                 <option value="Berkala" ${rec.keterangan === 'Berkala' ? 'selected' : ''}>Berkala</option>
                                 <option value="Perbaikan" ${rec.keterangan === 'Perbaikan' ? 'selected' : ''}>Perbaikan</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-400 mb-1">PERIODE (HARI)</label>
-                            <input type="number" id="periode_${idx}" value="${rec.periode || 90}" oninput="recalcNextDate(${idx})" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
+                            <input type="number" class="periode-input w-full px-2 py-1.5 border rounded text-xs bg-white" value="${rec.periode || 90}" oninput="recalcNextDate(this)">
                         </div>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">TANGGAL SELANJUTNYA (Otomatis dari Periode)</label>
-                        <input type="text" id="tglNext_${idx}" value="${rec.tglSelanjutnya}" class="w-full px-2 py-1.5 border rounded text-xs bg-slate-100 text-slate-600 font-medium" readonly>
+                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">TANGGAL SELANJUTNYA</label>
+                        <input type="text" class="tgl-next-input w-full px-2 py-1.5 border rounded text-xs bg-slate-100 text-slate-600 font-medium" value="${rec.tglSelanjutnya}" readonly>
                     </div>
-                    <input type="hidden" id="sheet_${idx}" value="${rec.sheetName}">
-                    <input type="hidden" id="row_${idx}" value="${rec.rowIndex}">
                 </div>
             `).join('');
 
             const modalBodyHtml = `
-                <div class="space-y-3">
+                <div class="space-y-3" id="editHistoryFormContainer">
                     <p class="text-xs font-bold text-slate-700 mb-2">Motor: ${namaMotor}</p>
                     ${recordsHtml}
                 </div>
             `;
 
             showModal("Kelola Riwayat & Periode Motor", modalBodyHtml, "fa-solid fa-clock-rotate-left", () => {
-                saveHistoryChanges(motorObj.records.length);
+                saveHistoryChanges();
             }, true, "Simpan Perubahan", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        function recalcNextDate(idx) {
-            let tglOrigStr = document.getElementById(`tglOrig_${idx}`).innerText;
-            let periodeVal = parseInt(document.getElementById(`periode_${idx}`).value) || 90;
+        // Hitung otomatis tanggal selanjutnya saat periode diubah
+        function recalcNextDate(inputEl) {
+            let container = inputEl.closest('.record-item');
+            let tglOrigStr = container.querySelector('.tgl-orig').innerText;
+            let periodeVal = parseInt(inputEl.value) || 90;
             
             let p = tglOrigStr.split('-');
             if (p.length === 3) {
@@ -250,27 +250,31 @@
                 let nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
                 let nextYear = String(dObj.getFullYear()).slice(-2);
                 
-                document.getElementById(`tglNext_${idx}`).value = `${nextDay}-${nextMonth}-${nextYear}`;
+                container.querySelector('.tgl-next-input').value = `${nextDay}-${nextMonth}-${nextYear}`;
             }
         }
 
-        async function saveHistoryChanges(count) {
+        async function saveHistoryChanges() {
+            let container = document.getElementById('editHistoryFormContainer');
+            let items = container.querySelectorAll('.record-item');
+
+            closeModal();
             showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menyimpan perubahan...</p></div>`, "fa-solid fa-sync", null, false);
 
             try {
-                for (let i = 0; i < count; i++) {
-                    let sheetName = document.getElementById(`sheet_${i}`).value;
-                    let rowIndex = document.getElementById(`row_${i}`).value;
-                    let keterangan = document.getElementById(`ket_${i}`).value;
-                    let periode = document.getElementById(`periode_${i}`).value;
-                    let tglSelanjutnya = document.getElementById(`tglNext_${i}`).value;
+                for (let item of items) {
+                    let sheetName = item.getAttribute('data-sheet');
+                    let rowIndex = parseInt(item.getAttribute('data-row'));
+                    let keterangan = item.querySelector('.ket-input').value;
+                    let periode = item.querySelector('.periode-input').value;
+                    let tglSelanjutnya = item.querySelector('.tgl-next-input').value;
 
                     await fetch(APPS_SCRIPT_URL, {
                         method: "POST",
                         body: JSON.stringify({
                             action: "edit_history",
                             sheetName: sheetName,
-                            rowIndex: parseInt(rowIndex),
+                            rowIndex: rowIndex,
                             keterangan: keterangan,
                             periode: periode,
                             tglSelanjutnya: tglSelanjutnya
@@ -278,34 +282,62 @@
                     });
                 }
                 closeModal();
+                showNotification("Berhasil", "Perubahan berhasil disimpan!", true);
                 loadHistoryData();
             } catch (err) {
                 closeModal();
-                alert("Gagal menyimpan perubahan.");
+                showNotification("Gagal", "Terjadi kesalahan saat menyimpan.", false);
             }
         }
 
+        // Konfirmasi Hapus Menggunakan Modal Custom (Seragam)
+        function confirmDeleteHistoryRow(sheetName, rowIndex) {
+            closeModal();
+            const messageHtml = `
+                <div class="text-center py-2">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
+                    <p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus riwayat penggantian ini dari database bulanan?</p>
+                    <p class="text-xs text-slate-400 mt-2">Tindakan ini tidak dapat dibatalkan.</p>
+                </div>
+            `;
+            showModal("Konfirmasi Hapus", messageHtml, "fa-solid fa-trash-can", () => {
+                deleteHistoryRow(sheetName, rowIndex);
+            }, true, "Ya, Hapus", "bg-rose-500 hover:bg-rose-600");
+        }
+
         async function deleteHistoryRow(sheetName, rowIndex) {
-            if (confirm("Apakah Anda yakin ingin menghapus riwayat penggantian ini dari database bulanan?")) {
+            closeModal();
+            showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghapus data...</p></div>`, "fa-solid fa-sync", null, false);
+            
+            try {
+                await fetch(APPS_SCRIPT_URL, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        action: "delete_history",
+                        sheetName: sheetName,
+                        rowIndex: rowIndex
+                    })
+                });
                 closeModal();
-                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghapus data...</p></div>`, "fa-solid fa-sync", null, false);
-                
-                try {
-                    await fetch(APPS_SCRIPT_URL, {
-                        method: "POST",
-                        body: JSON.stringify({
-                            action: "delete_history",
-                            sheetName: sheetName,
-                            rowIndex: rowIndex
-                        })
-                    });
-                    closeModal();
-                    loadHistoryData();
-                } catch (err) {
-                    closeModal();
-                    alert("Gagal menghapus riwayat.");
-                }
+                showNotification("Berhasil", "Riwayat berhasil dihapus!", true);
+                loadHistoryData();
+            } catch (err) {
+                closeModal();
+                showNotification("Gagal", "Gagal menghapus riwayat.", false);
             }
+        }
+
+        function showNotification(title, message, isSuccess = true) {
+            const icon = isSuccess ? "fa-solid fa-circle-check text-emerald-500" : "fa-solid fa-circle-exclamation text-rose-500";
+            const html = `
+                <div class="text-center py-3">
+                    <i class="${icon} text-4xl mb-3"></i>
+                    <p class="text-slate-800 font-semibold text-base">${message}</p>
+                </div>
+            `;
+            showModal(title, html, isSuccess ? "fa-solid fa-check" : "fa-solid fa-triangle-exclamation", () => {
+                closeModal();
+            }, true, "Tutup", isSuccess ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700");
         }
 
         function showModal(title, messageHtml, iconClass, onConfirmCallback, showFooter = true, confirmBtnText = "Simpan", confirmBtnClass = "bg-pmpAccent hover:bg-pmpHover") {
