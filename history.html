@@ -70,13 +70,14 @@
                             <th class="py-3 px-4">Tanggal Penggantian (MMYY)</th>
                             <th class="py-3 px-4">Jenis (Berkala / Perbaikan)</th>
                             <th class="py-3 px-4 text-center">Diganti (Kali)</th>
+                            <th class="py-3 px-4 text-center">Periode</th>
                             <th class="py-3 px-4">Tanggal Selanjutnya</th>
                             <th class="py-3 px-4 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody" class="divide-y divide-slate-200 text-sm">
                         <tr>
-                            <td colspan="7" class="text-center py-8 text-slate-400">
+                            <td colspan="8" class="text-center py-8 text-slate-400">
                                 <i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br>Memindai database bulanan...
                             </td>
                         </tr>
@@ -125,7 +126,7 @@
                     if (!motorMap[mName]) {
                         motorMap[mName] = {
                             namaMotor: mName,
-                            records: [] // Menyimpan detail tiap riwayat (sheetName, rowIndex, tgl, ket, tglSelanjutnya)
+                            records: []
                         };
                     }
                     motorMap[mName].records.push(item);
@@ -137,7 +138,7 @@
 
             } catch (err) {
                 console.error("Gagal memuat history:", err);
-                document.getElementById('tableBody').innerHTML = `<tr><td colspan="7" class="text-center py-6 text-rose-500">Gagal memuat data histori dari database.</td></tr>`;
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="8" class="text-center py-6 text-rose-500">Gagal memuat data histori dari database.</td></tr>`;
             }
         }
 
@@ -148,7 +149,7 @@
             tbody.innerHTML = '';
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">Belum ada data history tersimpan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">Belum ada data history tersimpan.</td></tr>`;
                 return;
             }
 
@@ -163,7 +164,11 @@
                     return `<span class="${color} px-2 py-0.5 rounded text-xs font-semibold mr-1">${r.keterangan}</span>`;
                 }).join('');
 
-                let latestNextDate = item.records.length > 0 ? item.records[item.records.length - 1].tglSelanjutnya : '-';
+                let latestRecord = item.records.length > 0 ? item.records[item.records.length - 1] : null;
+                let latestNextDate = latestRecord ? latestRecord.tglSelanjutnya : '-';
+                
+                // Ambil nilai periode dari data terakhir (default 90 hari jika belum ada)
+                let currentPeriode = "90"; 
 
                 let tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
@@ -173,6 +178,7 @@
                     <td class="py-3 px-4 text-slate-600 font-mono">${formattedDatesMMYY.join(', ')}</td>
                     <td class="py-3 px-4">${ketBadges}</td>
                     <td class="py-3 px-4 text-center font-bold text-sky-600">${item.records.length}x</td>
+                    <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${currentPeriode} Hari</span></td>
                     <td class="py-3 px-4 font-medium text-emerald-600">${latestNextDate}</td>
                     <td class="py-3 px-4 text-center space-x-1">
                         <button onclick="openEditHistoryModal('${item.namaMotor}')" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
@@ -188,7 +194,7 @@
             renderHistoryTable(filtered);
         }
 
-        // --- MODAL EDIT / HAPUS RIWAYAT HISTORY ---
+        // --- MODAL KELOLA / EDIT RIWAYAT & PERIODE ---
         function openEditHistoryModal(namaMotor) {
             let motorObj = aggregatedData.find(m => m.namaMotor === namaMotor);
             if (!motorObj) return;
@@ -196,19 +202,25 @@
             let recordsHtml = motorObj.records.map((rec, idx) => `
                 <div class="p-3 bg-slate-50 border rounded-lg mb-3 space-y-2">
                     <div class="flex justify-between items-center text-xs text-slate-500 font-semibold">
-                        <span>Bulan: ${rec.sheetName} | Tgl: ${rec.tglPenggantian}</span>
+                        <span>Bulan: ${rec.sheetName} | Tgl Terakhir: <b id="tglOrig_${idx}">${rec.tglPenggantian}</b></span>
                         <button onclick="deleteHistoryRow('${rec.sheetName}', ${rec.rowIndex})" class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-0.5 rounded text-xs transition"><i class="fa-solid fa-trash mr-1"></i> Hapus</button>
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">JENIS PEKERJAAN</label>
-                        <select id="ket_${idx}" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
-                            <option value="Berkala" ${rec.keterangan === 'Berkala' ? 'selected' : ''}>Berkala</option>
-                            <option value="Perbaikan" ${rec.keterangan === 'Perbaikan' ? 'selected' : ''}>Perbaikan</option>
-                        </select>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-400 mb-1">JENIS PEKERJAAN</label>
+                            <select id="ket_${idx}" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
+                                <option value="Berkala" ${rec.keterangan === 'Berkala' ? 'selected' : ''}>Berkala</option>
+                                <option value="Perbaikan" ${rec.keterangan === 'Perbaikan' ? 'selected' : ''}>Perbaikan</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-semibold text-slate-400 mb-1">PERIODE (HARI)</label>
+                            <input type="number" id="periode_${idx}" value="90" oninput="recalcNextDate(${idx})" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
+                        </div>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">TANGGAL SELANJUTNYA</label>
-                        <input type="text" id="tglNext_${idx}" value="${rec.tglSelanjutnya}" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
+                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">TANGGAL SELANJUTNYA (Otomatis dari Periode)</label>
+                        <input type="text" id="tglNext_${idx}" value="${rec.tglSelanjutnya}" class="w-full px-2 py-1.5 border rounded text-xs bg-slate-100 text-slate-600 font-medium" readonly>
                     </div>
                     <input type="hidden" id="sheet_${idx}" value="${rec.sheetName}">
                     <input type="hidden" id="row_${idx}" value="${rec.rowIndex}">
@@ -222,9 +234,27 @@
                 </div>
             `;
 
-            showModal("Kelola Riwayat Motor", modalBodyHtml, "fa-solid fa-clock-rotate-left", () => {
+            showModal("Kelola Riwayat & Periode Motor", modalBodyHtml, "fa-solid fa-clock-rotate-left", () => {
                 saveHistoryChanges(motorObj.records.length);
             }, true, "Simpan Perubahan", "bg-pmpAccent hover:bg-pmpHover");
+        }
+
+        // Hitung otomatis tanggal selanjutnya saat periode diubah di modal
+        function recalcNextDate(idx) {
+            let tglOrigStr = document.getElementById(`tglOrig_${idx}`).innerText; // Format DD-MM-YY
+            let periodeVal = parseInt(document.getElementById(`periode_${idx}`).value) || 90;
+            
+            let p = tglOrigStr.split('-');
+            if (p.length === 3) {
+                let dObj = new Date(`20${p[2]}`, p[1] - 1, p[0]);
+                dObj.setDate(dObj.getDate() + periodeVal);
+                
+                let nextDay = String(dObj.getDate()).padStart(2, '0');
+                let nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
+                let nextYear = String(dObj.getFullYear()).slice(-2);
+                
+                document.getElementById(`tglNext_${idx}`).value = `${nextDay}-${nextMonth}-${nextYear}`;
+            }
         }
 
         async function saveHistoryChanges(count) {
@@ -249,7 +279,7 @@
                     });
                 }
                 closeModal();
-                loadHistoryData(); // Muat ulang history secara otomatis
+                loadHistoryData();
             } catch (err) {
                 closeModal();
                 alert("Gagal menyimpan perubahan.");
@@ -271,7 +301,7 @@
                         })
                     });
                     closeModal();
-                    loadHistoryData(); // Refresh otomatis
+                    loadHistoryData();
                 } catch (err) {
                     closeModal();
                     alert("Gagal menghapus riwayat.");
