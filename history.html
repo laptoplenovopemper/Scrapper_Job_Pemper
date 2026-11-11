@@ -70,8 +70,8 @@
                             <th class="py-3 px-4">Tanggal Penggantian (MMYY)</th>
                             <th class="py-3 px-4">Jenis (Berkala / Perbaikan)</th>
                             <th class="py-3 px-4 text-center">Diganti (Kali)</th>
-                            <th class="py-3 px-4 text-center">Periode</th>
                             <th class="py-3 px-4">Tanggal Selanjutnya</th>
+                            <th class="py-3 px-4 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody" class="divide-y divide-slate-200 text-sm">
@@ -86,9 +86,29 @@
         </div>
     </main>
 
+    <!-- MODAL POP-UP -->
+    <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300" id="modalContainer">
+            <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
+                <h3 id="modalTitle" class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info text-pmpAccent"></i> Konfirmasi Aksi
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 text-slate-600 max-h-[75vh] overflow-y-auto" id="modalBody"></div>
+            <div class="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100" id="modalFooter">
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">Batal</button>
+                <button id="modalConfirmBtn" class="px-4 py-2 bg-pmpAccent hover:bg-pmpHover text-white font-medium rounded-lg text-sm transition shadow-sm">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPT -->
     <script>
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+        let rawHistoryData = [];
         let aggregatedData = [];
 
         async function loadHistoryData() {
@@ -97,25 +117,18 @@
                     method: "POST",
                     body: JSON.stringify({ action: "get_history_data" })
                 });
-                const rawData = await response.json();
+                rawHistoryData = await response.json();
 
                 let motorMap = {};
-                rawData.forEach(item => {
+                rawHistoryData.forEach(item => {
                     let mName = item.namaMotor.trim();
                     if (!motorMap[mName]) {
                         motorMap[mName] = {
                             namaMotor: mName,
-                            dates: [],
-                            keterangans: [],
-                            periode: "90",
-                            tglSelanjutnya: "-"
+                            records: [] // Menyimpan detail tiap riwayat (sheetName, rowIndex, tgl, ket, tglSelanjutnya)
                         };
                     }
-                    if (item.tglPenggantian && item.tglPenggantian !== "-") {
-                        motorMap[mName].dates.push(item.tglPenggantian);
-                        motorMap[mName].keterangans.push(item.keterangan || 'Berkala');
-                        motorMap[mName].tglSelanjutnya = item.tglSelanjutnya || "-";
-                    }
+                    motorMap[mName].records.push(item);
                 });
 
                 aggregatedData = Object.values(motorMap);
@@ -140,16 +153,17 @@
             }
 
             data.forEach((item, index) => {
-                let formattedDatesMMYY = item.dates.map(dStr => {
-                    let p = dStr.split('-');
-                    return p.length === 3 ? `${p[1]}${p[2]}` : dStr;
+                let formattedDatesMMYY = item.records.map(r => {
+                    let p = r.tglPenggantian.split('-');
+                    return p.length === 3 ? `${p[1]}${p[2]}` : r.tglPenggantian;
                 });
 
-                // Tampilkan badge keterangan per riwayat
-                let ketBadges = item.keterangans.map(k => {
-                    let color = k.toLowerCase() === 'perbaikan' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
-                    return `<span class="${color} px-2 py-0.5 rounded text-xs font-semibold mr-1">${k}</span>`;
+                let ketBadges = item.records.map(r => {
+                    let color = r.keterangan.toLowerCase() === 'perbaikan' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
+                    return `<span class="${color} px-2 py-0.5 rounded text-xs font-semibold mr-1">${r.keterangan}</span>`;
                 }).join('');
+
+                let latestNextDate = item.records.length > 0 ? item.records[item.records.length - 1].tglSelanjutnya : '-';
 
                 let tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
@@ -158,9 +172,11 @@
                     <td class="py-3 px-4 font-semibold text-slate-700">${item.namaMotor}</td>
                     <td class="py-3 px-4 text-slate-600 font-mono">${formattedDatesMMYY.join(', ')}</td>
                     <td class="py-3 px-4">${ketBadges}</td>
-                    <td class="py-3 px-4 text-center font-bold text-sky-600">${item.dates.length}x</td>
-                    <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${item.periode} Hari</span></td>
-                    <td class="py-3 px-4 font-medium text-emerald-600">${item.tglSelanjutnya}</td>
+                    <td class="py-3 px-4 text-center font-bold text-sky-600">${item.records.length}x</td>
+                    <td class="py-3 px-4 font-medium text-emerald-600">${latestNextDate}</td>
+                    <td class="py-3 px-4 text-center space-x-1">
+                        <button onclick="openEditHistoryModal('${item.namaMotor}')" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -170,6 +186,132 @@
             let input = document.getElementById('searchInput').value.toLowerCase();
             let filtered = aggregatedData.filter(row => row.namaMotor.toLowerCase().includes(input));
             renderHistoryTable(filtered);
+        }
+
+        // --- MODAL EDIT / HAPUS RIWAYAT HISTORY ---
+        function openEditHistoryModal(namaMotor) {
+            let motorObj = aggregatedData.find(m => m.namaMotor === namaMotor);
+            if (!motorObj) return;
+
+            let recordsHtml = motorObj.records.map((rec, idx) => `
+                <div class="p-3 bg-slate-50 border rounded-lg mb-3 space-y-2">
+                    <div class="flex justify-between items-center text-xs text-slate-500 font-semibold">
+                        <span>Bulan: ${rec.sheetName} | Tgl: ${rec.tglPenggantian}</span>
+                        <button onclick="deleteHistoryRow('${rec.sheetName}', ${rec.rowIndex})" class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-0.5 rounded text-xs transition"><i class="fa-solid fa-trash mr-1"></i> Hapus</button>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">JENIS PEKERJAAN</label>
+                        <select id="ket_${idx}" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
+                            <option value="Berkala" ${rec.keterangan === 'Berkala' ? 'selected' : ''}>Berkala</option>
+                            <option value="Perbaikan" ${rec.keterangan === 'Perbaikan' ? 'selected' : ''}>Perbaikan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">TANGGAL SELANJUTNYA</label>
+                        <input type="text" id="tglNext_${idx}" value="${rec.tglSelanjutnya}" class="w-full px-2 py-1.5 border rounded text-xs bg-white">
+                    </div>
+                    <input type="hidden" id="sheet_${idx}" value="${rec.sheetName}">
+                    <input type="hidden" id="row_${idx}" value="${rec.rowIndex}">
+                </div>
+            `).join('');
+
+            const modalBodyHtml = `
+                <div class="space-y-3">
+                    <p class="text-xs font-bold text-slate-700 mb-2">Motor: ${namaMotor}</p>
+                    ${recordsHtml}
+                </div>
+            `;
+
+            showModal("Kelola Riwayat Motor", modalBodyHtml, "fa-solid fa-clock-rotate-left", () => {
+                saveHistoryChanges(motorObj.records.length);
+            }, true, "Simpan Perubahan", "bg-pmpAccent hover:bg-pmpHover");
+        }
+
+        async function saveHistoryChanges(count) {
+            showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menyimpan perubahan...</p></div>`, "fa-solid fa-sync", null, false);
+
+            try {
+                for (let i = 0; i < count; i++) {
+                    let sheetName = document.getElementById(`sheet_${i}`).value;
+                    let rowIndex = document.getElementById(`row_${i}`).value;
+                    let keterangan = document.getElementById(`ket_${i}`).value;
+                    let tglSelanjutnya = document.getElementById(`tglNext_${i}`).value;
+
+                    await fetch(APPS_SCRIPT_URL, {
+                        method: "POST",
+                        body: JSON.stringify({
+                            action: "edit_history",
+                            sheetName: sheetName,
+                            rowIndex: parseInt(rowIndex),
+                            keterangan: keterangan,
+                            tglSelanjutnya: tglSelanjutnya
+                        })
+                    });
+                }
+                closeModal();
+                loadHistoryData(); // Muat ulang history secara otomatis
+            } catch (err) {
+                closeModal();
+                alert("Gagal menyimpan perubahan.");
+            }
+        }
+
+        async function deleteHistoryRow(sheetName, rowIndex) {
+            if (confirm("Apakah Anda yakin ingin menghapus riwayat penggantian ini dari database bulanan?")) {
+                closeModal();
+                showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghapus data...</p></div>`, "fa-solid fa-sync", null, false);
+                
+                try {
+                    await fetch(APPS_SCRIPT_URL, {
+                        method: "POST",
+                        body: JSON.stringify({
+                            action: "delete_history",
+                            sheetName: sheetName,
+                            rowIndex: rowIndex
+                        })
+                    });
+                    closeModal();
+                    loadHistoryData(); // Refresh otomatis
+                } catch (err) {
+                    closeModal();
+                    alert("Gagal menghapus riwayat.");
+                }
+            }
+        }
+
+        function showModal(title, messageHtml, iconClass, onConfirmCallback, showFooter = true, confirmBtnText = "Simpan", confirmBtnClass = "bg-pmpAccent hover:bg-pmpHover") {
+            document.getElementById('modalTitle').innerHTML = `<i class="${iconClass} text-sky-400 mr-2"></i> ${title}`;
+            document.getElementById('modalBody').innerHTML = messageHtml;
+            document.getElementById('modalFooter').style.display = showFooter ? 'flex' : 'none';
+            
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            confirmBtn.innerText = confirmBtnText;
+            confirmBtn.className = `px-4 py-2 ${confirmBtnClass} text-white font-medium rounded-lg text-sm transition shadow-sm`;
+
+            const modal = document.getElementById('customModal');
+            const container = document.getElementById('modalContainer');
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                container.classList.remove('scale-95');
+                container.classList.add('scale-100');
+            }, 10);
+
+            if (showFooter && onConfirmCallback) {
+                const newBtn = confirmBtn.cloneNode(true);
+                confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+                newBtn.addEventListener('click', () => { onConfirmCallback(); });
+            }
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('customModal');
+            const container = document.getElementById('modalContainer');
+            modal.classList.add('opacity-0');
+            container.classList.remove('scale-100');
+            container.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
         }
     </script>
 </body>
