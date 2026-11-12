@@ -195,9 +195,6 @@
                 let latestNextDate = latestRecord ? latestRecord.tglSelanjutnya : '-';
                 let currentPeriode = latestRecord ? (latestRecord.periode || '120') : '120';
 
-                // Simpan indeks record dalam bentuk string ter-JSON untuk multi-delete checkbox
-                let recordIdentifiers = item.records.map(r => JSON.stringify({ sheetName: r.sheetName, rowIndex: r.rowIndex })).join('|');
-
                 let tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
                 tr.innerHTML = `
@@ -219,7 +216,6 @@
             });
         }
 
-        // --- FITUR SORTING TANGGAL SELANJUTNYA ---
         function toggleSortNextDate() {
             sortAscending = !sortAscending;
             const sortIcon = document.getElementById('sortIcon');
@@ -236,7 +232,6 @@
             renderHistoryTable(aggregatedData);
         }
 
-        // --- FITUR MULTI-SELECTION (CHECKBOX) ---
         function toggleSelectAll(masterCheckbox) {
             const checkboxes = document.querySelectorAll('.row-checkbox');
             checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
@@ -264,7 +259,7 @@
                 <div class="text-center py-2">
                     <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
                     <p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus seluruh riwayat dari <b>${checkboxes.length}</b> motor terpilih?</p>
-                    <p class="text-xs text-slate-400 mt-2">Data yang dihapus akan hilang dari database bulanan.</p>
+                    <p class="text-xs text-slate-400 mt-2">Data akan langsung dihapus secara massal dari database bulanan.</p>
                 </div>
             `;
             showModal("Konfirmasi Hapus Massal", messageHtml, "fa-solid fa-trash-can", () => {
@@ -272,26 +267,32 @@
             }, true, "Ya, Hapus Semua", "bg-rose-500 hover:bg-rose-600");
         }
 
+        // --- HAPUS MASSAL SEKALIGUS DENGAN LOADING ---
         async function executeBulkDelete(checkboxes) {
             closeModal();
-            showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghapus data terpilih...</p></div>`, "fa-solid fa-sync", null, false);
+            // Tampilkan modal loading
+            showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-6"><i class="fa-solid fa-circle-notch fa-spin text-4xl text-sky-600 mb-3"></i><p class="text-sm font-semibold text-slate-700">Menghapus data terpilih secara massal...</p><p class="text-xs text-slate-400 mt-1">Mohon tunggu sebentar</p></div>`, "fa-solid fa-sync", null, false);
             
+            let allItemsToDelete = [];
+            checkboxes.forEach(cb => {
+                let records = JSON.parse(cb.getAttribute('data-records'));
+                records.forEach(r => {
+                    allItemsToDelete.push(r);
+                });
+            });
+
             try {
-                for (let cb of checkboxes) {
-                    let records = JSON.parse(cb.getAttribute('data-records'));
-                    for (let rec of records) {
-                        await fetch(APPS_SCRIPT_URL, {
-                            method: "POST",
-                            body: JSON.stringify({
-                                action: "delete_history",
-                                sheetName: rec.sheetName,
-                                rowIndex: rec.rowIndex
-                            })
-                        });
-                    }
-                }
+                // Kirim seluruh data yang akan dihapus dalam 1 kali request ke Apps Script
+                await fetch(APPS_SCRIPT_URL, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        action: "delete_history",
+                        items: allItemsToDelete
+                    })
+                });
+
                 closeModal();
-                showNotification("Berhasil", "Data terpilih berhasil dihapus!", true);
+                showNotification("Berhasil", "Data terpilih berhasil dihapus secara massal!", true);
                 loadHistoryData();
             } catch (err) {
                 closeModal();
@@ -305,7 +306,6 @@
             renderHistoryTable(filtered);
         }
 
-        // --- MODAL KELOLA / EDIT RIWAYAT & PERIODE ---
         function openEditHistoryModal(namaMotor) {
             let motorObj = aggregatedData.find(m => m.namaMotor === namaMotor);
             if (!motorObj) return;
@@ -425,8 +425,7 @@
                     method: "POST",
                     body: JSON.stringify({
                         action: "delete_history",
-                        sheetName: sheetName,
-                        rowIndex: rowIndex
+                        items: [{ sheetName: sheetName, rowIndex: rowIndex }]
                     })
                 });
                 closeModal();
