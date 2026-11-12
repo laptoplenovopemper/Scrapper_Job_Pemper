@@ -46,16 +46,22 @@
     <!-- MAIN CONTAINER -->
     <main class="max-w-7xl mx-auto px-4 py-6">
         
-        <!-- SEARCH BAR -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6 flex justify-between items-center">
+        <!-- SEARCH & ACTION BAR -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
             <div class="relative w-full md:w-80">
                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                     <i class="fa-solid fa-search text-xs"></i>
                 </span>
                 <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cari nama motor..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
             </div>
-            <div class="text-xs text-slate-500 font-medium">
-                Total Motor Tercatat: <span id="totalMotor" class="font-bold text-slate-800">0</span>
+            
+            <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+                <button onclick="confirmDeleteSelected()" id="bulkDeleteBtn" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-md text-sm font-medium transition shadow-sm hidden flex items-center gap-2">
+                    <i class="fa-solid fa-trash"></i> Hapus Terpilih (<span id="selectedCount">0</span>)
+                </button>
+                <div class="text-xs text-slate-500 font-medium">
+                    Total Motor Tercatat: <span id="totalMotor" class="font-bold text-slate-800">0</span>
+                </div>
             </div>
         </div>
 
@@ -65,19 +71,24 @@
                 <table class="w-full text-left border-collapse" id="historyTable">
                     <thead>
                         <tr class="bg-slate-800 text-white text-xs uppercase tracking-wider">
+                            <th class="py-3 px-3 text-center w-10">
+                                <input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)" class="rounded cursor-pointer">
+                            </th>
                             <th class="py-3 px-4 text-center w-12">No</th>
                             <th class="py-3 px-4">Nama Motor</th>
                             <th class="py-3 px-4">Tanggal Penggantian (MMYY)</th>
                             <th class="py-3 px-4">Jenis (Berkala / Perbaikan)</th>
                             <th class="py-3 px-4 text-center">Diganti (Kali)</th>
                             <th class="py-3 px-4 text-center">Periode</th>
-                            <th class="py-3 px-4">Tanggal Selanjutnya</th>
+                            <th class="py-3 px-4 cursor-pointer hover:bg-slate-700 transition select-none" onclick="toggleSortNextDate()">
+                                Tanggal Selanjutnya <i id="sortIcon" class="fa-solid fa-sort ml-1 text-slate-400"></i>
+                            </th>
                             <th class="py-3 px-4 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody" class="divide-y divide-slate-200 text-sm">
                         <tr>
-                            <td colspan="8" class="text-center py-8 text-slate-400">
+                            <td colspan="9" class="text-center py-8 text-slate-400">
                                 <i class="fa-solid fa-spinner fa-spin text-2xl mb-2"></i><br>Memindai database bulanan...
                             </td>
                         </tr>
@@ -111,6 +122,7 @@
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
         let rawHistoryData = [];
         let aggregatedData = [];
+        let sortAscending = true;
 
         async function loadHistoryData() {
             try {
@@ -132,7 +144,6 @@
                     motorMap[mName].records.push(item);
                 });
 
-                // Urutkan records setiap motor berdasarkan tanggal penggantian (kronologis dari lama ke terbaru)
                 Object.values(motorMap).forEach(motor => {
                     motor.records.sort((a, b) => parseDateObj(a.tglPenggantian) - parseDateObj(b.tglPenggantian));
                 });
@@ -140,10 +151,12 @@
                 aggregatedData = Object.values(motorMap);
                 document.getElementById('totalMotor').innerText = aggregatedData.length;
                 renderHistoryTable(aggregatedData);
+                document.getElementById('selectAll').checked = false;
+                toggleBulkDeleteButton();
 
             } catch (err) {
                 console.error("Gagal memuat history:", err);
-                document.getElementById('tableBody').innerHTML = `<tr><td colspan="8" class="text-center py-6 text-rose-500">Gagal memuat data histori dari database.</td></tr>`;
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="9" class="text-center py-6 text-rose-500">Gagal memuat data histori dari database.</td></tr>`;
             }
         }
 
@@ -163,7 +176,7 @@
             tbody.innerHTML = '';
 
             if (data.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-400">Belum ada data history tersimpan.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">Belum ada data history tersimpan.</td></tr>`;
                 return;
             }
 
@@ -178,14 +191,19 @@
                     return `<span class="${color} px-2 py-0.5 rounded text-xs font-semibold mr-1">${r.keterangan}</span>`;
                 }).join('');
 
-                // Ambil record terakhir (paling baru) untuk acuan tanggal selanjutnya & periode
                 let latestRecord = item.records.length > 0 ? item.records[item.records.length - 1] : null;
                 let latestNextDate = latestRecord ? latestRecord.tglSelanjutnya : '-';
                 let currentPeriode = latestRecord ? (latestRecord.periode || '120') : '120';
 
+                // Simpan indeks record dalam bentuk string ter-JSON untuk multi-delete checkbox
+                let recordIdentifiers = item.records.map(r => JSON.stringify({ sheetName: r.sheetName, rowIndex: r.rowIndex })).join('|');
+
                 let tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
                 tr.innerHTML = `
+                    <td class="py-3 px-3 text-center">
+                        <input type="checkbox" class="row-checkbox rounded cursor-pointer" data-records='[${item.records.map(r => `{"sheetName":"${r.sheetName}","rowIndex":${r.rowIndex}}`).join(',')}]' onclick="toggleBulkDeleteButton()">
+                    </td>
                     <td class="py-3 px-4 text-center font-medium text-slate-500">${index + 1}</td>
                     <td class="py-3 px-4 font-semibold text-slate-700">${item.namaMotor}</td>
                     <td class="py-3 px-4 text-slate-600 font-mono">${formattedDatesMMYY.join(', ')}</td>
@@ -199,6 +217,86 @@
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // --- FITUR SORTING TANGGAL SELANJUTNYA ---
+        function toggleSortNextDate() {
+            sortAscending = !sortAscending;
+            const sortIcon = document.getElementById('sortIcon');
+            sortIcon.className = sortAscending ? "fa-solid fa-sort-up ml-1 text-sky-400" : "fa-solid fa-sort-down ml-1 text-sky-400";
+
+            aggregatedData.sort((a, b) => {
+                let latestA = a.records.length > 0 ? a.records[a.records.length - 1].tglSelanjutnya : '';
+                let latestB = b.records.length > 0 ? b.records[b.records.length - 1].tglSelanjutnya : '';
+                let dateA = parseDateObj(latestA);
+                let dateB = parseDateObj(latestB);
+                return sortAscending ? dateA - dateB : dateB - dateA;
+            });
+
+            renderHistoryTable(aggregatedData);
+        }
+
+        // --- FITUR MULTI-SELECTION (CHECKBOX) ---
+        function toggleSelectAll(masterCheckbox) {
+            const checkboxes = document.querySelectorAll('.row-checkbox');
+            checkboxes.forEach(cb => cb.checked = masterCheckbox.checked);
+            toggleBulkDeleteButton();
+        }
+
+        function toggleBulkDeleteButton() {
+            const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+            const bulkBtn = document.getElementById('bulkDeleteBtn');
+            const countSpan = document.getElementById('selectedCount');
+            
+            countSpan.innerText = checkboxes.length;
+            if (checkboxes.length > 0) {
+                bulkBtn.classList.remove('hidden');
+            } else {
+                bulkBtn.classList.add('hidden');
+            }
+        }
+
+        function confirmDeleteSelected() {
+            const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+            if (checkboxes.length === 0) return;
+
+            const messageHtml = `
+                <div class="text-center py-2">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
+                    <p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus seluruh riwayat dari <b>${checkboxes.length}</b> motor terpilih?</p>
+                    <p class="text-xs text-slate-400 mt-2">Data yang dihapus akan hilang dari database bulanan.</p>
+                </div>
+            `;
+            showModal("Konfirmasi Hapus Massal", messageHtml, "fa-solid fa-trash-can", () => {
+                executeBulkDelete(checkboxes);
+            }, true, "Ya, Hapus Semua", "bg-rose-500 hover:bg-rose-600");
+        }
+
+        async function executeBulkDelete(checkboxes) {
+            closeModal();
+            showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghapus data terpilih...</p></div>`, "fa-solid fa-sync", null, false);
+            
+            try {
+                for (let cb of checkboxes) {
+                    let records = JSON.parse(cb.getAttribute('data-records'));
+                    for (let rec of records) {
+                        await fetch(APPS_SCRIPT_URL, {
+                            method: "POST",
+                            body: JSON.stringify({
+                                action: "delete_history",
+                                sheetName: rec.sheetName,
+                                rowIndex: rec.rowIndex
+                            })
+                        });
+                    }
+                }
+                closeModal();
+                showNotification("Berhasil", "Data terpilih berhasil dihapus!", true);
+                loadHistoryData();
+            } catch (err) {
+                closeModal();
+                showNotification("Gagal", "Terjadi kesalahan saat menghapus data.", false);
+            }
         }
 
         function filterTable() {
