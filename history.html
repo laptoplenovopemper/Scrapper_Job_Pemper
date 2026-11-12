@@ -98,7 +98,7 @@
         </div>
     </main>
 
-    <!-- MODAL POP-UP ELEGAN (SERAGAM) -->
+    <!-- MODAL POP-UP -->
     <div id="customModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
         <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300" id="modalContainer">
             <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
@@ -267,10 +267,8 @@
             }, true, "Ya, Hapus Semua", "bg-rose-500 hover:bg-rose-600");
         }
 
-        // --- HAPUS MASSAL SEKALIGUS DENGAN LOADING ---
         async function executeBulkDelete(checkboxes) {
             closeModal();
-            // Tampilkan modal loading
             showModal("Sedang Memproses...", `<div class="flex flex-col items-center py-6"><i class="fa-solid fa-circle-notch fa-spin text-4xl text-sky-600 mb-3"></i><p class="text-sm font-semibold text-slate-700">Menghapus data terpilih secara massal...</p><p class="text-xs text-slate-400 mt-1">Mohon tunggu sebentar</p></div>`, "fa-solid fa-sync", null, false);
             
             let allItemsToDelete = [];
@@ -282,7 +280,6 @@
             });
 
             try {
-                // Kirim seluruh data yang akan dihapus dalam 1 kali request ke Apps Script
                 await fetch(APPS_SCRIPT_URL, {
                     method: "POST",
                     body: JSON.stringify({
@@ -402,8 +399,8 @@
             }
         }
 
+        // --- DIPERBAIKI: Tombol Hapus di dalam Modal Edit ---
         function confirmDeleteHistoryRow(sheetName, rowIndex) {
-            closeModal();
             const messageHtml = `
                 <div class="text-center py-2">
                     <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
@@ -411,7 +408,8 @@
                     <p class="text-xs text-slate-400 mt-2">Tindakan ini tidak dapat dibatalkan.</p>
                 </div>
             `;
-            showModal("Konfirmasi Hapus", messageHtml, "fa-solid fa-trash-can", () => {
+            // Tampilkan modal konfirmasi tanpa menutup modal edit secara paksa sebelum dikonfirmasi
+            showModal("Konfirmasi Hapus Riwayat", messageHtml, "fa-solid fa-trash-can", () => {
                 deleteHistoryRow(sheetName, rowIndex);
             }, true, "Ya, Hapus", "bg-rose-500 hover:bg-rose-600");
         }
