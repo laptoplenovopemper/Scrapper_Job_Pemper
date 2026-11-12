@@ -329,7 +329,7 @@
                 const year = String(dObj.getFullYear()).slice(-2);
                 const tglTerakhir = `${day}-${month}-${year}`;
 
-                dObj.setDate(dObj.getDate() + 90);
+                dObj.setDate(dObj.getDate() + 120);
                 const nextDay = String(dObj.getDate()).padStart(2, '0');
                 const nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
                 const nextYear = String(dObj.getFullYear()).slice(-2);
@@ -348,7 +348,7 @@
             if(parts.length === 3) {
                 formattedDate = `20${parts[2]}-${parts[1]}-${parts[0]}`;
             }
-            let currentPeriode = row[5] || '90';
+            let currentPeriode = row[5] || '120';
             let currentKet = row[4] || 'Berkala';
             let originalTglTerakhir = row[2];
 
