@@ -335,7 +335,7 @@
                 const nextYear = String(dObj.getFullYear()).slice(-2);
                 const tglSelanjutnya = `${nextDay}-${nextMonth}-${nextYear}`;
 
-                const newData = [motor, mesin, tglTerakhir, personil, ket, "90", tglSelanjutnya];
+                const newData = [motor, mesin, tglTerakhir, personil, ket, "120", tglSelanjutnya];
                 submitToServer({ action: "add", data: newData }, "Data berhasil ditambahkan!");
             }, true, "Simpan Data", "bg-pmpAccent hover:bg-pmpHover");
         }
@@ -392,7 +392,7 @@
                 const mesin = document.getElementById('editMesin').value.trim();
                 const tglTerakhir = document.getElementById('origTgl').value;
                 const tglInputBase = document.getElementById('editTanggal').value;
-                const periodeVal = parseInt(document.getElementById('editPeriode').value) || 90;
+                const periodeVal = parseInt(document.getElementById('editPeriode').value) || 120;
                 const personil = document.getElementById('editPersonil').value.trim();
                 const ket = document.getElementById('editKeterangan').value;
 
