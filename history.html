@@ -132,6 +132,11 @@
                     motorMap[mName].records.push(item);
                 });
 
+                // Urutkan records setiap motor berdasarkan tanggal penggantian (kronologis dari lama ke terbaru)
+                Object.values(motorMap).forEach(motor => {
+                    motor.records.sort((a, b) => parseDateObj(a.tglPenggantian) - parseDateObj(b.tglPenggantian));
+                });
+
                 aggregatedData = Object.values(motorMap);
                 document.getElementById('totalMotor').innerText = aggregatedData.length;
                 renderHistoryTable(aggregatedData);
@@ -140,6 +145,15 @@
                 console.error("Gagal memuat history:", err);
                 document.getElementById('tableBody').innerHTML = `<tr><td colspan="8" class="text-center py-6 text-rose-500">Gagal memuat data histori dari database.</td></tr>`;
             }
+        }
+
+        function parseDateObj(dateStr) {
+            if (!dateStr) return new Date(0);
+            let p = dateStr.split('-');
+            if (p.length === 3) {
+                return new Date(`20${p[2]}`, p[1] - 1, p[0]);
+            }
+            return new Date(0);
         }
 
         window.onload = loadHistoryData;
@@ -164,9 +178,10 @@
                     return `<span class="${color} px-2 py-0.5 rounded text-xs font-semibold mr-1">${r.keterangan}</span>`;
                 }).join('');
 
+                // Ambil record terakhir (paling baru) untuk acuan tanggal selanjutnya & periode
                 let latestRecord = item.records.length > 0 ? item.records[item.records.length - 1] : null;
                 let latestNextDate = latestRecord ? latestRecord.tglSelanjutnya : '-';
-                let currentPeriode = latestRecord ? (latestRecord.periode || '90') : '90';
+                let currentPeriode = latestRecord ? (latestRecord.periode || '120') : '120';
 
                 let tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
@@ -213,7 +228,7 @@
                         </div>
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-400 mb-1">PERIODE (HARI)</label>
-                            <input type="number" class="periode-input w-full px-2 py-1.5 border rounded text-xs bg-white" value="${rec.periode || 90}" oninput="recalcNextDate(this)">
+                            <input type="number" class="periode-input w-full px-2 py-1.5 border rounded text-xs bg-white" value="${rec.periode || 120}" oninput="recalcNextDate(this)">
                         </div>
                     </div>
                     <div>
@@ -235,11 +250,10 @@
             }, true, "Simpan Perubahan", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // Hitung otomatis tanggal selanjutnya saat periode diubah
         function recalcNextDate(inputEl) {
             let container = inputEl.closest('.record-item');
             let tglOrigStr = container.querySelector('.tgl-orig').innerText;
-            let periodeVal = parseInt(inputEl.value) || 90;
+            let periodeVal = parseInt(inputEl.value) || 120;
             
             let p = tglOrigStr.split('-');
             if (p.length === 3) {
@@ -290,7 +304,6 @@
             }
         }
 
-        // Konfirmasi Hapus Menggunakan Modal Custom (Seragam)
         function confirmDeleteHistoryRow(sheetName, rowIndex) {
             closeModal();
             const messageHtml = `
