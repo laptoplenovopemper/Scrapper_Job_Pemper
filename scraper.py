@@ -143,9 +143,9 @@ def run_scraper():
                     
                     nama_motor = clean_motor_name(raw_job)
                     keterangan = "" 
-                    periode = "90"
+                    periode = "120"
                     
-                    next_dt = dt_obj + timedelta(days=90)
+                    next_dt = dt_obj + timedelta(days=120)
                     tgl_selanjutnya = next_dt.strftime("%d-%m-%y")
                     
                     row_final = [nama_motor, nama_mesin, tgl_terakhir, personil, keterangan, periode, tgl_selanjutnya]
