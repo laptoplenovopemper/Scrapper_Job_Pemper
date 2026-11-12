@@ -163,6 +163,7 @@
             data.forEach((row, index) => {
                 let ket = row[4] || 'Berkala';
                 let badgeClass = ket.toLowerCase() === 'perbaikan' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
+                let periodeVal = row[5] || '120';
 
                 let tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition";
@@ -173,7 +174,7 @@
                     <td class="py-3 px-4 text-slate-600">${row[2] || '-'}</td>
                     <td class="py-3 px-4 text-slate-600">${row[3] || '-'}</td>
                     <td class="py-3 px-4"><span class="${badgeClass} px-2.5 py-1 rounded-full text-xs font-bold">${ket}</span></td>
-                    <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${row[5] || '120'} Hari</span></td>
+                    <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${periodeVal} Hari</span></td>
                     <td class="py-3 px-4 font-medium text-emerald-600">${row[6] || '-'}</td>
                     <td class="py-3 px-4 text-center space-x-1">
                         <button onclick="openEditModal(${index})" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
@@ -280,7 +281,7 @@
             }, true, "Ya, Simpan", "bg-emerald-600 hover:bg-emerald-700");
         }
 
-        // --- TAMBAH DATA (Dengan Keterangan Dropdown) ---
+        // --- TAMBAH DATA (Default Periode 120 Hari) ---
         function openAddModal() {
             const today = new Date().toISOString().split('T')[0];
             const htmlForm = `
@@ -296,6 +297,10 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1">TANGGAL PENGGANTIAN</label>
                         <input type="date" id="inputTanggal" value="${today}" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">PERIODE (HARI)</label>
+                        <input type="number" id="inputPeriode" value="120" class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1">PERSONIL</label>
@@ -315,6 +320,7 @@
                 const motor = document.getElementById('inputMotor').value.trim();
                 const mesin = document.getElementById('inputMesin').value.trim();
                 const tglInput = document.getElementById('inputTanggal').value;
+                const periodeVal = parseInt(document.getElementById('inputPeriode').value) || 120;
                 const personil = document.getElementById('inputPersonil').value.trim();
                 const ket = document.getElementById('inputKeterangan').value;
 
@@ -329,18 +335,18 @@
                 const year = String(dObj.getFullYear()).slice(-2);
                 const tglTerakhir = `${day}-${month}-${year}`;
 
-                dObj.setDate(dObj.getDate() + 120);
+                dObj.setDate(dObj.getDate() + periodeVal);
                 const nextDay = String(dObj.getDate()).padStart(2, '0');
                 const nextMonth = String(dObj.getMonth() + 1).padStart(2, '0');
                 const nextYear = String(dObj.getFullYear()).slice(-2);
                 const tglSelanjutnya = `${nextDay}-${nextMonth}-${nextYear}`;
 
-                const newData = [motor, mesin, tglTerakhir, personil, ket, "120", tglSelanjutnya];
+                const newData = [motor, mesin, tglTerakhir, personil, ket, String(periodeVal), tglSelanjutnya];
                 submitToServer({ action: "add", data: newData }, "Data berhasil ditambahkan!");
             }, true, "Simpan Data", "bg-pmpAccent hover:bg-pmpHover");
         }
 
-        // --- EDIT DATA (Dengan Keterangan Dropdown & Periode) ---
+        // --- EDIT DATA (Default Periode 120 Hari) ---
         function openEditModal(index) {
             const row = globalData[index];
             let parts = row[2] ? row[2].split('-') : [];
