@@ -14,6 +14,11 @@ on:
         required: true
         type: string
 
+      run_id:
+        description: 'ID pelacakan progress dari Web App'
+        required: true
+        type: string
+
   schedule:
     - cron: '0 0 * * *'
 
@@ -48,6 +53,9 @@ jobs:
           # Tanggal dari Web App
           INPUT_DATE_FROM: ${{ github.event.inputs.date_from }}
           INPUT_DATE_TO: ${{ github.event.inputs.date_to }}
+
+          # ID untuk menghubungkan progress Python dengan Apps Script
+          INPUT_RUN_ID: ${{ github.event.inputs.run_id || github.run_id }}
 
         run: |
           python scraper.py
