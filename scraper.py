@@ -1,12 +1,10 @@
-
 import os
 import re
 import time
-import logging
 import requests
-
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
+from urllib.parse import urlencode
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -14,12 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import (
-    TimeoutException,
-    NoSuchElementException,
-    StaleElementReferenceException
-)
-
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 
 
@@ -28,136 +21,192 @@ from webdriver_manager.chrome import ChromeDriverManager
 # ============================================================
 
 LOGIN_URL = "http://job.pmp.web.id/login/"
-DASHBOARD_URL = "http://job.pmp.web.id/dashboard/"
+
+BASE_URL = "http://job.pmp.web.id/"
 
 APPS_SCRIPT_URL = (
     "https://script.google.com/macros/s/"
     "AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec"
 )
 
-APPSHEET_APP_ID = os.getenv("APPSHEET_APP_ID", "")
-APPSHEET_ACCESS_KEY = os.getenv("APPSHEET_ACCESS_KEY", "")
+APPSHEET_APP_ID = os.getenv("APPSHEET_APP_ID", "").strip()
+APPSHEET_ACCESS_KEY = os.getenv("APPSHEET_ACCESS_KEY", "").strip()
+
 APPSHEET_TABLE = "Trial"
 
-SCRAPER_USERNAME = os.getenv("SCRAPER_USERNAME", "")
-SCRAPER_PASSWORD = os.getenv("SCRAPER_PASSWORD", "")
+USERNAME = os.getenv("SCRAPER_USERNAME", "").strip()
+PASSWORD = os.getenv("SCRAPER_PASSWORD", "").strip()
 
-INPUT_DATE_FROM = os.getenv("INPUT_DATE_FROM", "")
-INPUT_DATE_TO = os.getenv("INPUT_DATE_TO", "")
-
-SEARCH_KEYWORD = "GANTI MOTOR"
+SEARCH_KEYWORD = "Ganti Motor"
 
 TIMEZONE = ZoneInfo("Asia/Jakarta")
 
-WAIT_TIMEOUT = 30
+# Pengaturan browser
+HEADLESS = True
+PAGE_LOAD_TIMEOUT = 45
+ELEMENT_TIMEOUT = 20
 MAX_PAGES = 100
 
-PERIOD_DEFAULT = "120"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-
-logger = logging.getLogger("SCRAPER")
+# Jika True, data Job PMP tetap dicoba diambil meskipun
+# header tabel tidak berhasil dibaca.
+ALLOW_FALLBACK_COLUMN = True
 
 
 # ============================================================
-# 2. PROGRES SCRAPER
-# ============================================================
-
-def report_progress(percent, stage, detail="", status="running"):
-    """
-    Mengirim progres ke Google Apps Script.
-
-    Kegagalan pengiriman progres tidak boleh menghentikan scraper.
-    """
-
-    percent = max(0, min(100, int(percent)))
-
-    payload = {
-        "action": "update_scraper_progress",
-        "percent": percent,
-        "stage": str(stage),
-        "detail": str(detail),
-        "status": str(status),
-        "updated_at": datetime.now(TIMEZONE).isoformat()
-    }
-
-    try:
-        requests.post(
-            APPS_SCRIPT_URL,
-            json=payload,
-            timeout=15
-        )
-
-    except Exception as error:
-        logger.warning(
-            "Gagal mengirim progres: %s",
-            error
-        )
-
-
-# ============================================================
-# 3. RENTANG TANGGAL
+# 2. RENTANG TANGGAL
 # ============================================================
 
 def get_date_range():
 
-    today = datetime.now(TIMEZONE).date()
+    date_from_env = os.getenv("INPUT_DATE_FROM", "").strip()
+    date_to_env = os.getenv("INPUT_DATE_TO", "").strip()
 
-    if INPUT_DATE_FROM and INPUT_DATE_TO:
+    if date_from_env and date_to_env:
 
-        date_from = parse_date(INPUT_DATE_FROM)
-        date_to = parse_date(INPUT_DATE_TO)
+        date_from = datetime.strptime(
+            date_from_env, "%Y-%m-%d"
+        ).date()
 
-        if date_from > date_to:
-            raise ValueError(
-                "Tanggal awal tidak boleh lebih besar "
-                "dari tanggal akhir."
-            )
+        date_to = datetime.strptime(
+            date_to_env, "%Y-%m-%d"
+        ).date()
 
-        return date_from, date_to
+        print(
+            f"=== TANGGAL KUSTOM: "
+            f"{date_from} s/d {date_to} ==="
+        )
 
-    date_from = today - timedelta(days=30)
-    date_to = today
+    elif not date_from_env and not date_to_env:
+
+        date_to = datetime.now(TIMEZONE).date()
+        date_from = date_to - timedelta(days=29)
+
+        print(
+            f"=== DEFAULT 30 HARI: "
+            f"{date_from} s/d {date_to} ==="
+        )
+
+    else:
+
+        raise ValueError(
+            "Tanggal mulai dan tanggal selesai harus diisi bersamaan."
+        )
+
+    if date_from > date_to:
+        raise ValueError(
+            "Tanggal mulai tidak boleh lebih besar dari tanggal selesai."
+        )
 
     return date_from, date_to
 
 
-def parse_date(value):
+# ============================================================
+# 3. KONVERSI TANGGAL
+# ============================================================
 
-    if isinstance(value, date):
-        return value
+def universal_date_converter(date_str):
 
-    value = str(value).strip()
+    if not date_str:
+        return None, ""
+
+    clean_str = re.sub(
+        r'\((Done|Open)\)',
+        '',
+        str(date_str),
+        flags=re.IGNORECASE
+    ).strip()
+
+    clean_str = re.sub(
+        r'\s+',
+        ' ',
+        clean_str
+    )
+
+    current_year = datetime.now(TIMEZONE).year
+
+    bulan_indo = {
+        'januari': 'January',
+        'februari': 'February',
+        'maret': 'March',
+        'april': 'April',
+        'mei': 'May',
+        'juni': 'June',
+        'juli': 'July',
+        'agustus': 'August',
+        'september': 'September',
+        'oktober': 'October',
+        'november': 'November',
+        'desember': 'December',
+        'jan': 'Jan',
+        'feb': 'Feb',
+        'mar': 'Mar',
+        'apr': 'Apr',
+        'mei': 'May',
+        'jun': 'Jun',
+        'jul': 'Jul',
+        'agu': 'Aug',
+        'sep': 'Sep',
+        'okt': 'Oct',
+        'nov': 'Nov',
+        'des': 'Dec'
+    }
+
+    lower_str = clean_str.lower()
+
+    for id_m, en_m in bulan_indo.items():
+
+        if id_m in lower_str:
+
+            clean_str = re.sub(
+                id_m,
+                en_m,
+                lower_str,
+                flags=re.IGNORECASE
+            )
+
+            break
 
     formats = [
+        "%d %b %Y",
+        "%d %b %y",
+        "%d %B %Y",
+        "%d %B",
+        "%d %b",
         "%Y-%m-%d",
-        "%d-%m-%Y",
         "%d/%m/%Y",
-        "%Y/%m/%d",
-        "%d-%m-%y",
-        "%d/%m/%y"
+        "%d-%m-%Y",
+        "%d-%m-%y"
     ]
 
     for fmt in formats:
 
         try:
-            return datetime.strptime(value, fmt).date()
+
+            if fmt in ("%d %B", "%d %b"):
+
+                parsed = datetime.strptime(
+                    f"{clean_str} {current_year}",
+                    fmt + " %Y"
+                )
+
+            else:
+
+                parsed = datetime.strptime(
+                    clean_str,
+                    fmt
+                )
+
+            return parsed, parsed.strftime("%d-%m-%y")
 
         except ValueError:
-            pass
+            continue
 
-    raise ValueError(
-        "Format tanggal tidak dikenali: " + value
-    )
+    return None, ""
 
 
-def universal_date_converter(value):
+def parse_appsheet_date(value):
 
-    if value is None:
+    if value is None or str(value).strip() == "":
         return None
 
     if isinstance(value, datetime):
@@ -168,810 +217,1016 @@ def universal_date_converter(value):
 
     value = str(value).strip()
 
-    if not value:
-        return None
-
     formats = [
         "%Y-%m-%d",
-        "%Y-%m-%d %H:%M:%S",
-        "%d-%m-%Y",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%m/%d/%Y",
         "%d/%m/%Y",
-        "%d %B %Y",
-        "%d %b %Y",
-        "%Y/%m/%d",
+        "%m/%d/%y",
+        "%d-%m-%Y",
         "%d-%m-%y",
-        "%d/%m/%y"
+        "%Y/%m/%d"
     ]
 
     for fmt in formats:
 
         try:
-            return datetime.strptime(value, fmt).date()
+
+            return datetime.strptime(
+                value[:26] if "%f" in fmt else value,
+                fmt
+            ).date()
 
         except ValueError:
-            pass
-
-    # Format tanggal Indonesia, misalnya 16 Nov 2026.
-    months = {
-        "JANUARI": 1,
-        "FEBRUARI": 2,
-        "MARET": 3,
-        "APRIL": 4,
-        "MEI": 5,
-        "JUNI": 6,
-        "JULI": 7,
-        "AGUSTUS": 8,
-        "SEPTEMBER": 9,
-        "OKTOBER": 10,
-        "NOVEMBER": 11,
-        "DESEMBER": 12,
-        "JAN": 1,
-        "FEB": 2,
-        "MAR": 3,
-        "APR": 4,
-        "JUN": 6,
-        "JUL": 7,
-        "AGU": 8,
-        "AGS": 8,
-        "SEP": 9,
-        "OKT": 10,
-        "NOV": 11,
-        "DES": 12
-    }
-
-    match = re.search(
-        r"(\d{1,2})\s+([A-Z]+)\s+(\d{4})",
-        value.upper()
-    )
-
-    if match:
-
-        day = int(match.group(1))
-        month_name = match.group(2)
-        year = int(match.group(3))
-
-        month = months.get(month_name)
-
-        if month:
-            return date(year, month, day)
-
-    return None
-
-
-def format_date(value):
-
-    parsed = universal_date_converter(value)
-
-    if not parsed:
-        return ""
-
-    return parsed.strftime("%d-%m-%Y")
-
-
-# ============================================================
-# 4. NORMALISASI TEKS DAN MESIN
-# ============================================================
-
-def clean_text(value):
-
-    value = str(value or "").strip()
-
-    value = re.sub(r"\s+", " ", value)
-
-    return value
-
-
-def normalize_machine_name(value):
-
-    value = clean_text(value).upper()
-
-    match = re.search(
-        r"\bFS\s*0*(\d+)\b",
-        value
-    )
-
-    if not match:
-        return value
-
-    return "FS " + str(int(match.group(1)))
-
-
-def normalize_sub_machine(value):
-
-    return clean_text(value).upper()
-
-
-def clean_motor_name(value):
-
-    value = clean_text(value).upper()
-
-    value = re.sub(
-        r"\s+",
-        " ",
-        value
-    )
-
-    return value.strip()
-
-
-def extract_motor_from_detail(detail):
-
-    """
-    Mengambil nama motor dari teks pekerjaan setelah
-    kata Ganti Motor.
-
-    Contoh:
-    Ganti Motor WINCH UTARA DM
-    Hasil: WINCH UTARA DM
-    """
-
-    detail = clean_text(detail).upper()
-
-    if not detail:
-        return ""
-
-    match = re.search(
-        r"GANTI\s+MOTOR\s*(.*)",
-        detail,
-        flags=re.IGNORECASE
-    )
-
-    if not match:
-        return ""
-
-    motor = match.group(1).strip()
-
-    # Buang informasi tambahan setelah pemisah umum.
-    motor = re.split(
-        r"\s*(?:\||;|\n)\s*",
-        motor
-    )[0]
-
-    return clean_motor_name(motor)
-
-
-# ============================================================
-# 5. PEMBANTU SELENIUM
-# ============================================================
-
-def create_driver():
-
-    options = Options()
-
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--disable-notifications")
-    options.add_argument("--lang=id-ID")
-
-    options.add_experimental_option(
-        "prefs",
-        {
-            "profile.default_content_setting_values.notifications": 2
-        }
-    )
-
-    service = Service(
-        ChromeDriverManager().install()
-    )
-
-    return webdriver.Chrome(
-        service=service,
-        options=options
-    )
-
-
-def find_first_element(driver, selectors):
-
-    for by, selector in selectors:
-
-        try:
-            element = driver.find_element(
-                by,
-                selector
-            )
-
-            if element:
-                return element
-
-        except NoSuchElementException:
             continue
 
     return None
 
 
-def login_job_pmp(driver):
+# ============================================================
+# 4. PEMBERSIHAN NAMA MOTOR
+# ============================================================
 
-    logger.info("Membuka halaman login Job PMP...")
+def clean_motor_name(raw_text):
 
-    driver.get(LOGIN_URL)
+    text = str(raw_text or "").strip()
 
-    wait = WebDriverWait(
-        driver,
-        WAIT_TIMEOUT
+    text = re.sub(
+        r'^(ganti\s+motor\s*|'
+        r'cek\s+dan\s+dial\s+motor\s+pisau\s*-\s*'
+        r'ganti\s+motor\s+jika\s+ada\s+yang\s+jelek\s+nilainya\s*[:]?\s*)',
+        '',
+        text,
+        flags=re.IGNORECASE
     )
 
-    wait.until(
-        EC.presence_of_element_located(
-            (By.TAG_NAME, "body")
-        )
-    )
+    text = re.split(
+        r'(&|,|\bTrial\b)',
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE
+    )[0].strip()
 
-    username_input = find_first_element(
-        driver,
-        [
-            (By.NAME, "username"),
-            (By.ID, "username"),
-            (By.NAME, "email"),
-            (By.ID, "email"),
-            (By.CSS_SELECTOR, "input[type='text']"),
-            (By.CSS_SELECTOR, "input[type='email']")
-        ]
-    )
-
-    password_input = find_first_element(
-        driver,
-        [
-            (By.NAME, "password"),
-            (By.ID, "password"),
-            (By.CSS_SELECTOR, "input[type='password']")
-        ]
-    )
-
-    if not username_input or not password_input:
-
-        raise Exception(
-            "Input username/password tidak ditemukan."
-        )
-
-    if not SCRAPER_USERNAME or not SCRAPER_PASSWORD:
-
-        raise Exception(
-            "SCRAPER_USERNAME atau SCRAPER_PASSWORD "
-            "belum diatur pada environment."
-        )
-
-    username_input.clear()
-    username_input.send_keys(SCRAPER_USERNAME)
-
-    password_input.clear()
-    password_input.send_keys(SCRAPER_PASSWORD)
-
-    submit_button = find_first_element(
-        driver,
-        [
-            (By.CSS_SELECTOR, "button[type='submit']"),
-            (By.CSS_SELECTOR, "input[type='submit']"),
-            (By.XPATH, "//button[contains(., 'Login')]"),
-            (By.XPATH, "//button[contains(., 'Masuk')]")
-        ]
-    )
-
-    if submit_button:
-
-        submit_button.click()
-
-    else:
-
-        password_input.submit()
-
-    time.sleep(3)
-
-    logger.info(
-        "Proses login selesai. URL sekarang: %s",
-        driver.current_url
-    )
+    return text if text else str(raw_text or "").strip()
 
 
 # ============================================================
-# 6. DETEKSI KOLOM TABEL JOB PMP
+# 5. EKSTRAKSI NAMA MOTOR DARI DETAIL PEKERJAAN APPSHEET
 # ============================================================
 
-def normalize_header(value):
+def extract_motor_from_detail(detail_pekerjaan):
 
-    value = clean_text(value).lower()
+    if not detail_pekerjaan:
+        return ""
 
-    value = re.sub(
-        r"[^a-z0-9 ]",
-        " ",
-        value
+    text = str(detail_pekerjaan).strip()
+
+    match = re.search(
+        r'ganti\s+motor\s*[:\-]?\s*(.*)',
+        text,
+        flags=re.IGNORECASE | re.DOTALL
     )
 
-    value = re.sub(
-        r"\s+",
-        " ",
-        value
+    if not match:
+        return ""
+
+    nama_motor = match.group(1).strip()
+
+    nama_motor = re.split(
+        r'[,&;\n]|\bTrial\b',
+        nama_motor,
+        maxsplit=1,
+        flags=re.IGNORECASE
+    )[0].strip()
+
+    return nama_motor.strip(" :-_.")
+
+
+# ============================================================
+# 6. NORMALISASI NAMA MESIN
+# ============================================================
+
+def normalize_machine_name(raw_machine):
+
+    if not raw_machine:
+        return ""
+
+    text = str(raw_machine).strip()
+
+    match = re.search(
+        r'\bFS\s*0*(\d{1,2})\b',
+        text,
+        flags=re.IGNORECASE
     )
 
-    return value.strip()
+    if match:
+        return f"FS {int(match.group(1))}"
+
+    return text.upper()
+
+
+# ============================================================
+# 7. NORMALISASI SUB MESIN
+# ============================================================
+
+def normalize_sub_machine(raw_sub_machine):
+
+    if not raw_sub_machine:
+        return ""
+
+    return re.sub(
+        r'\s+',
+        ' ',
+        str(raw_sub_machine).strip()
+    ).upper()
+
+
+# ============================================================
+# 8. MEMBACA HEADER TABEL JOB.PMP
+# ============================================================
+
+def normalize_header(text):
+
+    return re.sub(
+        r'[^a-z0-9]',
+        '',
+        str(text or '').lower()
+    )
 
 
 def get_job_table_column_indices(driver):
+
     """
-    Mendeteksi indeks kolom berdasarkan header tabel.
+    Mencari header tabel berdasarkan nama kolom.
 
-    PENTING:
-    Kolom personil hanya boleh berasal dari header 'Personil'.
-    Header 'PIC' tidak pernah dianggap sebagai Personil.
+    Fallback posisi lama:
+    Job       = 1
+    Personil  = 3
+    Mesin     = 5
+    Jadwal    = 9
+
+    Sub Mesin tidak ditebak posisinya.
+    Jika tidak ditemukan, nilainya dikosongkan.
     """
 
-    tables = driver.find_elements(
-        By.TAG_NAME,
-        "table"
-    )
+    indices = {
+        "job": 1,
+        "personil": 3,
+        "mesin": 5,
+        "jadwal": 9,
+        "sub_mesin": None
+    }
 
-    selected_table = None
-    selected_headers = []
+    try:
 
-    for table in tables:
+        tables = driver.find_elements(
+            By.XPATH,
+            "//table"
+        )
 
-        try:
+        for table in tables:
 
-            header_elements = table.find_elements(
-                By.CSS_SELECTOR,
-                "thead tr th"
+            headers = table.find_elements(
+                By.XPATH,
+                ".//thead//th"
             )
 
-            if not header_elements:
+            if not headers:
 
-                header_elements = table.find_elements(
-                    By.CSS_SELECTOR,
-                    "tr:first-child th, tr:first-child td"
+                headers = table.find_elements(
+                    By.XPATH,
+                    ".//tr[1]/*"
                 )
-
-            headers = [
-                normalize_header(element.text)
-                for element in header_elements
-            ]
 
             if not headers:
                 continue
 
-            if "personil" in headers:
+            header_map = {}
 
-                selected_table = table
-                selected_headers = headers
-                break
+            for index, header in enumerate(headers):
 
-        except StaleElementReferenceException:
-            continue
+                key = normalize_header(header.text)
 
-    if selected_table is None:
+                if key:
+                    header_map[key] = index
 
-        raise Exception(
-            "Tabel Job PMP dengan header 'Personil' "
-            "tidak ditemukan. Scraper tidak akan "
-            "mengambil data dari kolom PIC."
+            aliases = {
+                "job": [
+                    "pekerjaan",
+                    "detailpekerjaan",
+                    "namapekerjaan",
+                    "job",
+                    "aktivitas"
+                ],
+                "personil": [
+                    "pic",
+                    "personil",
+                    "nama",
+                    "pelaksana"
+                ],
+                "mesin": [
+                    "mesin",
+                    "namamesin"
+                ],
+                "sub_mesin": [
+                    "submesin",
+                    "namasubmesin"
+                ],
+                "jadwal": [
+                    "jadwal",
+                    "tanggal",
+                    "tanggalpekerjaan",
+                    "tanggaljadwal"
+                ]
+            }
+
+            found = 0
+
+            for field, names in aliases.items():
+
+                for name in names:
+
+                    if name in header_map:
+
+                        indices[field] = header_map[name]
+                        found += 1
+                        break
+
+            if found > 0:
+
+                print(
+                    "   Header tabel ditemukan:",
+                    header_map
+                )
+
+                print(
+                    "   Posisi kolom yang digunakan:",
+                    indices
+                )
+
+                return indices
+
+        print(
+            "   PERINGATAN: Header tabel tidak ditemukan."
         )
 
-    logger.info(
-        "Header tabel Job PMP: %s",
-        selected_headers
-    )
-
-    def find_column(*names):
-
-        for index, header in enumerate(selected_headers):
-
-            if header in names:
-                return index
-
-        return None
-
-    indices = {
-        "job": find_column(
-            "pekerjaan",
-            "job",
-            "nama pekerjaan",
-            "detil pekerjaan",
-            "detail pekerjaan"
-        ),
-
-        # HANYA header Personil.
-        "personil": find_column("personil"),
-
-        "mesin": find_column(
-            "mesin",
-            "nama mesin"
-        ),
-
-        "jadwal": find_column(
-            "jadwal",
-            "tanggal",
-            "tgl",
-            "tanggal pekerjaan"
-        ),
-
-        "sub_mesin": find_column(
-            "sub mesin",
-            "submesin"
-        ),
-
-        "status": find_column(
-            "status"
-        )
-    }
-
-    if indices["personil"] is None:
-
-        raise Exception(
-            "Header 'Personil' tidak ditemukan. "
-            "Kolom PIC tidak akan digunakan sebagai pengganti."
+        print(
+            "   Menggunakan posisi kolom cadangan:",
+            indices
         )
 
-    if indices["job"] is None:
+    except Exception as e:
 
-        raise Exception(
-            "Kolom pekerjaan tidak ditemukan pada tabel Job PMP."
+        print(
+            "   Gagal membaca header tabel:",
+            str(e)
         )
 
-    if indices["mesin"] is None:
-
-        raise Exception(
-            "Kolom Mesin tidak ditemukan pada tabel Job PMP."
-        )
-
-    logger.info(
-        "Indeks kolom Job PMP: %s",
-        indices
-    )
-
-    return selected_table, indices
+    return indices
 
 
-def get_cell_value(cells, index):
+# ============================================================
+# 9. FUNGSI BANTU SCRAPER JOB PMP
+# ============================================================
+
+def get_cell_value(col_data, index):
 
     if index is None:
         return ""
 
-    if index < 0 or index >= len(cells):
+    if index < 0 or index >= len(col_data):
         return ""
 
-    return clean_text(cells[index].text)
+    return str(col_data[index] or "").strip()
 
 
-# ============================================================
-# 7. DETEKSI PAGINATION JOB PMP
-# ============================================================
+def find_date_done_in_row(col_data):
 
-def get_next_page_button(driver):
+    """
+    Mencari sel yang berisi tanggal dan status Done.
+    Ini menjadi cadangan jika posisi kolom Jadwal berubah.
+    """
 
-    selectors = [
-        (By.CSS_SELECTOR, "a[rel='next']"),
-        (By.CSS_SELECTOR, "li.next a"),
-        (By.CSS_SELECTOR, ".pagination .next a"),
-        (By.XPATH, "//a[contains(., 'Next')]"),
-        (By.XPATH, "//a[contains(., 'Berikutnya')]"),
-        (By.XPATH, "//button[contains(., 'Next')]")
-    ]
+    for cell in col_data:
 
-    for by, selector in selectors:
-
-        try:
-
-            element = driver.find_element(
-                by,
-                selector
-            )
-
-            if element.is_displayed():
-
-                classes = (
-                    element.get_attribute("class") or ""
-                ).lower()
-
-                parent_classes = ""
-
-                try:
-                    parent_classes = (
-                        element.find_element(
-                            By.XPATH,
-                            ".."
-                        ).get_attribute("class") or ""
-                    ).lower()
-
-                except Exception:
-                    pass
-
-                if (
-                    "disabled" in classes
-                    or "disabled" in parent_classes
-                ):
-                    return None
-
-                return element
-
-        except NoSuchElementException:
+        if not re.search(
+            r'\(\s*Done\s*\)',
+            cell,
+            flags=re.IGNORECASE
+        ):
             continue
 
-    return None
+        date_text = re.sub(
+            r'\(\s*Done\s*\)',
+            '',
+            cell,
+            flags=re.IGNORECASE
+        ).strip()
+
+        dt_obj, formatted = universal_date_converter(
+            date_text
+        )
+
+        if dt_obj:
+            return cell, dt_obj, formatted
+
+    return "", None, ""
 
 
-def click_next_page(driver):
+def find_job_text_in_row(col_data):
 
-    next_button = get_next_page_button(driver)
+    """
+    Mencari kolom yang benar-benar berisi Ganti Motor.
+    Berguna jika indeks kolom pekerjaan berubah.
+    """
 
-    if not next_button:
-        return False
+    for cell in col_data:
+
+        lower = cell.lower()
+
+        if (
+            "ganti motor" in lower
+            and "dial motor" not in lower
+        ):
+            return cell
+
+    return ""
+
+
+def find_machine_text_in_row(col_data):
+
+    for cell in col_data:
+
+        if re.search(
+            r'\bFS\s*0*\d{1,2}\b',
+            cell,
+            flags=re.IGNORECASE
+        ):
+            return cell
+
+    return ""
+
+
+def find_sub_machine_text_in_row(col_data):
+
+    """
+    Tidak menebak kolom Sub Mesin dari posisi.
+    Hanya digunakan jika header memang memberikan indeks.
+    """
+
+    return ""
+
+
+def save_debug_screenshot(driver, filename="job_pmp_debug.png"):
 
     try:
 
-        old_url = driver.current_url
+        driver.save_screenshot(filename)
 
-        driver.execute_script(
-            "arguments[0].click();",
-            next_button
+        print(
+            f"   Screenshot debug tersimpan: {filename}"
         )
 
-        time.sleep(2)
-
-        if driver.current_url != old_url:
-            return True
-
-        return True
-
     except Exception:
-
-        return False
+        pass
 
 
 # ============================================================
-# 8. SCRAPER JOB PMP
+# 10. SCRAPER PERTAMA: JOB.PMP.WEB.ID
 # ============================================================
 
 def run_job_scraper(date_from, date_to):
 
-    logger.info("=" * 60)
-    logger.info("MEMULAI SCRAPER JOB PMP")
-    logger.info("=" * 60)
+    print("\n" + "=" * 60)
+    print("SCRAPER 1: JOB.PMP.WEB.ID")
+    print("=" * 60)
 
-    report_progress(
-        5,
-        "Job PMP",
-        "Mempersiapkan browser dan login"
-    )
+    processed_data = []
 
     driver = None
 
-    all_data = []
+    query_params = {
+        "date_from": date_from.strftime("%Y-%m-%d"),
+        "date_to": date_to.strftime("%Y-%m-%d"),
+        "pic": "",
+        "line": "",
+        "mesin": "",
+        "sub_mesin": "",
+        "departemen": "",
+        "bagian": "",
+        "sub_bagian": "",
+        "search": SEARCH_KEYWORD,
+        "page_size": "100"
+    }
+
+    dashboard_url = (
+        BASE_URL + "?" + urlencode(query_params)
+    )
 
     try:
 
-        driver = create_driver()
+        if not USERNAME or not PASSWORD:
 
-        login_job_pmp(driver)
+            raise ValueError(
+                "SCRAPER_USERNAME atau SCRAPER_PASSWORD kosong. "
+                "Periksa Secrets GitHub Actions."
+            )
 
-        report_progress(
-            10,
-            "Job PMP",
-            "Login berhasil, membuka halaman pekerjaan"
+        print("1. Menyiapkan Chrome...")
+
+        options = Options()
+
+        if HEADLESS:
+            options.add_argument("--headless=new")
+
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-popup-blocking")
+        options.add_argument("--lang=id-ID")
+
+        driver = webdriver.Chrome(
+            service=Service(
+                ChromeDriverManager().install()
+            ),
+            options=options
         )
 
-        driver.get(DASHBOARD_URL)
+        driver.set_page_load_timeout(
+            PAGE_LOAD_TIMEOUT
+        )
 
         wait = WebDriverWait(
             driver,
-            WAIT_TIMEOUT
+            ELEMENT_TIMEOUT
         )
+
+        # ----------------------------------------------------
+        # LOGIN
+        # ----------------------------------------------------
+
+        print("2. Membuka halaman login...")
+
+        driver.get(LOGIN_URL)
 
         wait.until(
             EC.presence_of_element_located(
-                (By.TAG_NAME, "body")
+                (By.ID, "id_username")
             )
         )
 
-        time.sleep(3)
+        username_field = driver.find_element(
+            By.ID,
+            "id_username"
+        )
 
-        seen_pages = set()
+        password_field = driver.find_element(
+            By.ID,
+            "id_password"
+        )
 
-        page_number = 0
+        username_field.clear()
+        username_field.send_keys(USERNAME)
 
-        while page_number < MAX_PAGES:
+        password_field.clear()
+        password_field.send_keys(PASSWORD)
 
-            page_number += 1
+        login_button = driver.find_element(
+            By.XPATH,
+            "//button[@type='submit']"
+        )
 
-            logger.info(
-                "Memproses halaman Job PMP ke-%s",
-                page_number
+        login_button.click()
+
+        time.sleep(4)
+
+        print(
+            "   URL setelah login:",
+            driver.current_url
+        )
+
+        # Pastikan tidak kembali ke halaman login
+        if "login" in driver.current_url.lower():
+
+            page_text = driver.find_element(
+                By.TAG_NAME,
+                "body"
+            ).text
+
+            print(
+                "   Isi halaman setelah login:",
+                page_text[:500]
             )
 
-            page_signature = driver.current_url
+            raise RuntimeError(
+                "Login Job PMP gagal atau masih berada di halaman login."
+            )
 
-            if page_signature in seen_pages:
-                logger.info(
-                    "Halaman berulang terdeteksi, pagination dihentikan."
+        print("   Login berhasil atau sesi sudah aktif.")
+
+        # ----------------------------------------------------
+        # BUKA DASHBOARD
+        # ----------------------------------------------------
+
+        print("3. Mengakses dashboard Job PMP...")
+
+        print(
+            "   URL dashboard:",
+            dashboard_url
+        )
+
+        driver.get(dashboard_url)
+
+        try:
+
+            wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//table")
                 )
+            )
+
+        except TimeoutException:
+
+            print(
+                "   Tabel tidak muncul dalam waktu tunggu."
+            )
+
+            print(
+                "   URL saat ini:",
+                driver.current_url
+            )
+
+            print(
+                "   Isi halaman:",
+                driver.find_element(
+                    By.TAG_NAME,
+                    "body"
+                ).text[:1500]
+            )
+
+            save_debug_screenshot(driver)
+
+            raise RuntimeError(
+                "Tabel Job PMP tidak ditemukan."
+            )
+
+        time.sleep(2)
+
+        print(
+            "   Dashboard berhasil dibuka:",
+            driver.current_url
+        )
+
+        column_indices = get_job_table_column_indices(
+            driver
+        )
+
+        # ----------------------------------------------------
+        # PROSES PAGINATION
+        # ----------------------------------------------------
+
+        page_num = 1
+        visited_pages = set()
+
+        while page_num <= MAX_PAGES:
+
+            print("\n----------------------------------------")
+
+            print(
+                f"MEMPROSES HALAMAN {page_num}"
+            )
+
+            print("----------------------------------------")
+
+            time.sleep(1)
+
+            # Hindari memproses halaman yang sama berulang kali
+            current_url = driver.current_url
+
+            if current_url in visited_pages:
+
+                print(
+                    "   URL halaman sudah pernah diproses. Berhenti."
+                )
+
                 break
 
-            seen_pages.add(page_signature)
+            visited_pages.add(current_url)
 
-            table, column_indices = (
-                get_job_table_column_indices(driver)
+            rows = driver.find_elements(
+                By.XPATH,
+                "//table//tbody/tr"
             )
 
-            rows = table.find_elements(
-                By.CSS_SELECTOR,
-                "tbody tr"
+            print(
+                f"   Jumlah baris ditemukan: {len(rows)}"
             )
 
             if not rows:
 
-                rows = table.find_elements(
-                    By.CSS_SELECTOR,
-                    "tr"
-                )[1:]
+                print(
+                    "   Tidak ada baris pada halaman ini."
+                )
 
-            for row_element in rows:
+                print(
+                    "   Isi halaman:",
+                    driver.find_element(
+                        By.TAG_NAME,
+                        "body"
+                    ).text[:1000]
+                )
+
+                break
+
+            page_added = 0
+
+            for row_number, row in enumerate(rows, start=1):
 
                 try:
 
-                    cells = row_element.find_elements(
-                        By.CSS_SELECTOR,
+                    cols = row.find_elements(
+                        By.TAG_NAME,
                         "td"
                     )
 
-                    if not cells:
+                    col_data = [
+                        col.text.strip()
+                        for col in cols
+                    ]
+
+                    # Abaikan baris kosong, bukan berdasarkan
+                    # jumlah kolom minimal 10.
+                    if not col_data or not any(col_data):
                         continue
 
-                    row_text = clean_text(
-                        row_element.text
-                    ).upper()
+                    # ----------------------------------------
+                    # AMBIL NAMA PEKERJAAN
+                    # ----------------------------------------
 
-                    # Hanya pekerjaan selesai.
-                    if not re.search(
-                        r"\bDONE\b",
-                        row_text
+                    raw_job = get_cell_value(
+                        col_data,
+                        column_indices.get("job")
+                    )
+
+                    if (
+                        not raw_job
+                        or "ganti motor" not in raw_job.lower()
+                        or "dial motor" in raw_job.lower()
                     ):
-                        continue
 
-                    job_text = get_cell_value(
-                        cells,
-                        column_indices["job"]
-                    )
-
-                    if SEARCH_KEYWORD not in job_text.upper():
-                        continue
-
-                    # Ambil Personil hanya dari kolom Personil.
-                    personil = get_cell_value(
-                        cells,
-                        column_indices["personil"]
-                    )
-
-                    mesin = get_cell_value(
-                        cells,
-                        column_indices["mesin"]
-                    )
-
-                    jadwal = get_cell_value(
-                        cells,
-                        column_indices["jadwal"]
-                    )
-
-                    sub_mesin = get_cell_value(
-                        cells,
-                        column_indices["sub_mesin"]
-                    )
-
-                    if not personil:
-                        logger.warning(
-                            "Personil kosong pada baris: %s",
-                            row_text
+                        # Cadangan: cari di semua kolom
+                        raw_job = find_job_text_in_row(
+                            col_data
                         )
 
-                    tanggal = universal_date_converter(
-                        jadwal
+                    if not raw_job:
+
+                        continue
+
+                    # ----------------------------------------
+                    # AMBIL TANGGAL DAN STATUS DONE
+                    # ----------------------------------------
+
+                    jadwal_teks = get_cell_value(
+                        col_data,
+                        column_indices.get("jadwal")
                     )
 
-                    if not tanggal:
-                        logger.warning(
-                            "Tanggal tidak terbaca: %s",
-                            jadwal
+                    dt_obj = None
+                    tgl_terakhir = ""
+
+                    if re.search(
+                        r'\(\s*Done\s*\)',
+                        jadwal_teks,
+                        flags=re.IGNORECASE
+                    ):
+
+                        raw_tgl_str = re.sub(
+                            r'\(\s*Done\s*\)',
+                            '',
+                            jadwal_teks,
+                            flags=re.IGNORECASE
+                        ).strip()
+
+                        dt_obj, tgl_terakhir = universal_date_converter(
+                            raw_tgl_str
                         )
+
+                    # Jika posisi jadwal salah, cari di seluruh sel
+                    if not dt_obj:
+
+                        (
+                            jadwal_teks,
+                            dt_obj,
+                            tgl_terakhir
+                        ) = find_date_done_in_row(
+                            col_data
+                        )
+
+                    if not dt_obj:
+
+                        print(
+                            f"   Baris {row_number}: "
+                            f"tanggal Done tidak ditemukan."
+                        )
+
                         continue
+
+                    # ----------------------------------------
+                    # FILTER RENTANG TANGGAL
+                    # ----------------------------------------
 
                     if not (
-                        date_from <= tanggal <= date_to
+                        date_from <= dt_obj.date() <= date_to
                     ):
+
                         continue
 
-                    motor = extract_motor_from_detail(
-                        job_text
+                    # ----------------------------------------
+                    # AMBIL MESIN
+                    # ----------------------------------------
+
+                    mesin_teks = get_cell_value(
+                        col_data,
+                        column_indices.get("mesin")
                     )
 
-                    if not motor:
-                        logger.warning(
-                            "Nama motor tidak berhasil diekstrak: %s",
-                            job_text
-                        )
-                        continue
+                    if not mesin_teks:
 
-                    mesin = normalize_machine_name(
-                        mesin
+                        mesin_teks = find_machine_text_in_row(
+                            col_data
+                        )
+
+                    nama_mesin = normalize_machine_name(
+                        mesin_teks
+                    )
+
+                    # ----------------------------------------
+                    # AMBIL SUB MESIN
+                    # ----------------------------------------
+
+                    sub_mesin_teks = get_cell_value(
+                        col_data,
+                        column_indices.get("sub_mesin")
                     )
 
                     sub_mesin = normalize_sub_machine(
-                        sub_mesin
+                        sub_mesin_teks
                     )
 
-                    row_data = [
-                        motor,
-                        mesin,
+                    # ----------------------------------------
+                    # AMBIL PERSONIL
+                    # ----------------------------------------
+
+                    personil = get_cell_value(
+                        col_data,
+                        column_indices.get("personil")
+                    )
+
+                    # ----------------------------------------
+                    # NAMA MOTOR
+                    # ----------------------------------------
+
+                    nama_motor = clean_motor_name(
+                        raw_job
+                    )
+
+                    if not nama_motor:
+
+                        continue
+
+                    # ----------------------------------------
+                    # DATA BERKALA
+                    # ----------------------------------------
+
+                    keterangan = "Berkala"
+                    periode = "120"
+
+                    next_dt = dt_obj + timedelta(days=120)
+
+                    tgl_selanjutnya = next_dt.strftime(
+                        "%d-%m-%y"
+                    )
+
+                    row_final = [
+                        nama_motor,
+                        nama_mesin,
                         sub_mesin,
-                        tanggal.strftime("%d-%m-%Y"),
-                        personil.upper(),
-                        "BERKALA",
-                        PERIOD_DEFAULT,
-                        (
-                            tanggal + timedelta(
-                                days=int(PERIOD_DEFAULT)
-                            )
-                        ).strftime("%d-%m-%Y")
+                        tgl_terakhir,
+                        personil,
+                        keterangan,
+                        periode,
+                        tgl_selanjutnya
                     ]
 
-                    all_data.append(row_data)
-
-                except StaleElementReferenceException:
-                    continue
-
-                except Exception as error:
-
-                    logger.warning(
-                        "Baris Job PMP dilewati: %s",
-                        error
+                    processed_data.append(
+                        row_final
                     )
 
-            logger.info(
-                "Halaman %s selesai. Total data Job PMP: %s",
-                page_number,
-                len(all_data)
+                    page_added += 1
+
+                    print(
+                        f"   [BERKALA] {nama_motor} | "
+                        f"{nama_mesin} | {sub_mesin} | "
+                        f"{tgl_terakhir} | {personil}"
+                    )
+
+                except Exception as row_error:
+
+                    print(
+                        f"   ERROR baris {row_number}:",
+                        str(row_error)
+                    )
+
+                    continue
+
+            print(
+                f"   Data berhasil diambil dari halaman ini: "
+                f"{page_added}"
             )
 
-            # Progres Job PMP dibuat bertahap.
-            # Persentase ini merupakan progres tahap,
-            # bukan jumlah halaman keseluruhan.
-            progress = min(
-                40,
-                10 + page_number * 3
-            )
+            # ------------------------------------------------
+            # CARI TOMBOL HALAMAN BERIKUTNYA
+            # ------------------------------------------------
 
-            report_progress(
-                progress,
-                "Job PMP",
-                (
-                    "Halaman diproses: "
-                    + str(page_number)
-                    + " | Data ditemukan: "
-                    + str(len(all_data))
+            next_button = None
+
+            next_xpaths = [
+                "//a[contains(normalize-space(.), 'Selanjutnya')]",
+                "//a[contains(normalize-space(.), 'Next')]",
+                "//a[@aria-label='Next']",
+                "//li[contains(@class,'next')]/a",
+                "//a[contains(@class,'next')]",
+                "//button[contains(normalize-space(.), 'Selanjutnya')]",
+                "//button[contains(normalize-space(.), 'Next')]"
+            ]
+
+            for xpath in next_xpaths:
+
+                try:
+
+                    candidates = driver.find_elements(
+                        By.XPATH,
+                        xpath
+                    )
+
+                    for candidate in candidates:
+
+                        if candidate.is_displayed():
+
+                            next_button = candidate
+                            break
+
+                    if next_button:
+                        break
+
+                except Exception:
+                    continue
+
+            if not next_button:
+
+                print(
+                    "   Tombol halaman berikutnya tidak ditemukan."
                 )
-            )
 
-            if not click_next_page(driver):
+                print(
+                    "   Dianggap sebagai halaman terakhir."
+                )
+
                 break
 
-        logger.info(
-            "Scraper Job PMP selesai. Total: %s",
-            len(all_data)
+            # Periksa apakah tombol dinonaktifkan
+            try:
+
+                parent = next_button.find_element(
+                    By.XPATH,
+                    "./.."
+                )
+
+                disabled_text = (
+                    str(next_button.get_attribute("class") or "")
+                    + " "
+                    + str(parent.get_attribute("class") or "")
+                    + " "
+                    + str(next_button.get_attribute("aria-disabled") or "")
+                ).lower()
+
+                if (
+                    "disabled" in disabled_text
+                    or "true" in disabled_text
+                ):
+
+                    print(
+                        "   Tombol berikutnya disabled. Selesai."
+                    )
+
+                    break
+
+            except Exception:
+                pass
+
+            # Klik halaman berikutnya
+            try:
+
+                old_url = driver.current_url
+
+                driver.execute_script(
+                    "arguments[0].click();",
+                    next_button
+                )
+
+                time.sleep(3)
+
+                # Tunggu perubahan halaman jika URL berubah
+                if driver.current_url != old_url:
+
+                    print(
+                        "   Berhasil pindah halaman."
+                    )
+
+                else:
+
+                    print(
+                        "   Tombol diklik, URL tidak berubah."
+                    )
+
+                page_num += 1
+
+                # Header mungkin berubah/ter-render ulang
+                column_indices = get_job_table_column_indices(
+                    driver
+                )
+
+            except Exception as pagination_error:
+
+                print(
+                    "   Gagal pindah halaman:",
+                    str(pagination_error)
+                )
+
+                break
+
+        # ----------------------------------------------------
+        # RINGKASAN
+        # ----------------------------------------------------
+
+        print("\n========================================")
+
+        print(
+            "TOTAL DATA BERKALA JOB PMP:",
+            len(processed_data)
         )
 
-        report_progress(
-            42,
-            "Job PMP",
-            "Selesai mengambil data Job PMP"
+        print("========================================")
+
+        if len(processed_data) == 0:
+
+            print(
+                "PERINGATAN: Tidak ada data Job PMP yang lolos filter."
+            )
+
+            print(
+                "URL terakhir:",
+                driver.current_url
+            )
+
+            save_debug_screenshot(driver)
+
+    except Exception as e:
+
+        print("\n[ERROR JOB.PMP.WEB.ID]")
+
+        print(
+            type(e).__name__,
+            ":",
+            str(e)
         )
 
-        return all_data
+        if driver:
 
-    except Exception as error:
+            try:
 
-        logger.exception(
-            "Scraper Job PMP gagal: %s",
-            error
-        )
+                print(
+                    "URL saat error:",
+                    driver.current_url
+                )
 
-        raise
+                print(
+                    "Isi halaman saat error:",
+                    driver.find_element(
+                        By.TAG_NAME,
+                        "body"
+                    ).text[:1500]
+                )
+
+                save_debug_screenshot(driver)
+
+            except Exception:
+                pass
 
     finally:
 
@@ -979,45 +1234,38 @@ def run_job_scraper(date_from, date_to):
 
             try:
                 driver.quit()
-
             except Exception:
                 pass
 
+    return processed_data
+
 
 # ============================================================
-# 9. APPSHEET
+# 11. SCRAPER KEDUA: APPSHEET
 # ============================================================
 
-def parse_appsheet_date(value):
+def run_appsheet_scraper(date_from, date_to):
 
-    if value is None:
-        return None
+    print("\n" + "=" * 60)
+    print("SCRAPER 2: APPSHEET")
+    print("=" * 60)
 
-    if isinstance(value, dict):
-        value = value.get("Date", value.get("date", ""))
+    if not APPSHEET_APP_ID or not APPSHEET_ACCESS_KEY:
 
-    return universal_date_converter(value)
-
-
-def get_appsheet_rows():
-
-    if not APPSHEET_APP_ID:
-        raise Exception(
-            "APPSHEET_APP_ID belum diatur."
+        raise ValueError(
+            "APPSHEET_APP_ID atau APPSHEET_ACCESS_KEY belum tersedia."
         )
 
-    if not APPSHEET_ACCESS_KEY:
-        raise Exception(
-            "APPSHEET_ACCESS_KEY belum diatur."
-        )
-
-    url = (
-        "https://api.appsheet.com/api/v2/apps/"
-        + APPSHEET_APP_ID
-        + "/tables/"
-        + APPSHEET_TABLE
-        + "/Action"
+    api_url = (
+        f"https://api.appsheet.com/api/v2/apps/"
+        f"{APPSHEET_APP_ID}/tables/"
+        f"{APPSHEET_TABLE}/Action"
     )
+
+    headers = {
+        "ApplicationAccessKey": APPSHEET_ACCESS_KEY,
+        "Content-Type": "application/json"
+    }
 
     payload = {
         "Action": "Find",
@@ -1028,381 +1276,290 @@ def get_appsheet_rows():
         "Rows": []
     }
 
-    headers = {
-        "ApplicationAccessKey": APPSHEET_ACCESS_KEY,
-        "Content-Type": "application/json"
-    }
+    print("1. Menghubungi API AppSheet...")
 
     response = requests.post(
-        url,
+        api_url,
         headers=headers,
         json=payload,
-        timeout=60
+        timeout=120
     )
 
     response.raise_for_status()
 
     result = response.json()
 
-    if not isinstance(result, list):
+    if isinstance(result, list):
 
-        raise Exception(
-            "Respons AppSheet bukan berupa list data: "
-            + str(result)
+        rows = result
+
+    elif isinstance(result, dict):
+
+        rows = result.get("Rows", [])
+
+    else:
+
+        rows = []
+
+    if not isinstance(rows, list):
+
+        raise ValueError(
+            "Format respons API AppSheet tidak sesuai."
         )
 
-    return result
-
-
-def run_appsheet_scraper(date_from, date_to):
-
-    logger.info("=" * 60)
-    logger.info("MEMULAI SCRAPER APPSHEET")
-    logger.info("=" * 60)
-
-    report_progress(
-        45,
-        "AppSheet",
-        "Mengambil data dari AppSheet"
+    print(
+        f"2. Total baris diterima dari AppSheet: "
+        f"{len(rows)}"
     )
 
-    rows = get_appsheet_rows()
+    processed_data = []
 
-    all_data = []
+    for item in rows:
 
-    total = len(rows)
+        if not isinstance(item, dict):
+            continue
 
-    logger.info(
-        "Jumlah baris AppSheet: %s",
-        total
-    )
+        detail_pekerjaan = str(
+            item.get("Detil Pekerjaan", "") or ""
+        ).strip()
 
-    for index, row in enumerate(rows, start=1):
+        if SEARCH_KEYWORD.lower() not in detail_pekerjaan.lower():
+            continue
 
-        try:
+        raw_date = item.get("Tanggal", "")
 
-            # Hanya menggunakan Detil Pekerjaan.
-            detail = clean_text(
-                row.get("Detil Pekerjaan", "")
-            )
+        tanggal_obj = parse_appsheet_date(raw_date)
 
-            if SEARCH_KEYWORD not in detail.upper():
-                continue
+        if tanggal_obj is None:
+            continue
 
-            # Motor wajib diambil dari teks setelah Ganti Motor.
-            motor = extract_motor_from_detail(
-                detail
-            )
+        if not (
+            date_from <= tanggal_obj <= date_to
+        ):
+            continue
 
-            if not motor:
-                continue
-
-            tanggal_value = row.get("Tanggal", "")
-
-            tanggal = parse_appsheet_date(
-                tanggal_value
-            )
-
-            if not tanggal:
-                continue
-
-            if not (
-                date_from <= tanggal <= date_to
-            ):
-                continue
-
-            mesin = normalize_machine_name(
-                row.get("Mesin", "")
-            )
-
-            sub_mesin = normalize_sub_machine(
-                row.get("Sub Mesin", "")
-            )
-
-            personil = clean_text(
-                row.get(
-                    "PIC",
-                    row.get("Nama", "")
-                )
-            ).upper()
-
-            row_data = [
-                motor,
-                mesin,
-                sub_mesin,
-                tanggal.strftime("%d-%m-%Y"),
-                personil,
-                "PERBAIKAN",
-                PERIOD_DEFAULT,
-                (
-                    tanggal + timedelta(
-                        days=int(PERIOD_DEFAULT)
-                    )
-                ).strftime("%d-%m-%Y")
-            ]
-
-            all_data.append(row_data)
-
-        except Exception as error:
-
-            logger.warning(
-                "Baris AppSheet ke-%s dilewati: %s",
-                index,
-                error
-            )
-
-        if total > 0 and index % 20 == 0:
-
-            progress = 45 + int(
-                (index / total) * 25
-            )
-
-            report_progress(
-                min(progress, 70),
-                "AppSheet",
-                (
-                    "Memproses "
-                    + str(index)
-                    + " dari "
-                    + str(total)
-                    + " baris"
-                )
-            )
-
-    logger.info(
-        "Scraper AppSheet selesai. Total: %s",
-        len(all_data)
-    )
-
-    report_progress(
-        72,
-        "AppSheet",
-        (
-            "Selesai mengambil "
-            + str(len(all_data))
-            + " data AppSheet"
+        nama_motor = extract_motor_from_detail(
+            detail_pekerjaan
         )
+
+        if not nama_motor:
+
+            print(
+                "   Melewati data karena nama motor "
+                "tidak ditemukan setelah Ganti Motor."
+            )
+
+            continue
+
+        mesin = str(
+            item.get("Mesin", "") or ""
+        ).strip()
+
+        nama_mesin = normalize_machine_name(
+            mesin
+        )
+
+        sub_mesin = normalize_sub_machine(
+            item.get("Sub Mesin", "")
+        )
+
+        personil = str(
+            item.get("PIC", "")
+            or item.get("Nama", "")
+            or ""
+        ).strip()
+
+        tgl_terakhir = tanggal_obj.strftime(
+            "%d-%m-%y"
+        )
+
+        keterangan = "Perbaikan"
+        periode = "120"
+
+        next_date = tanggal_obj + timedelta(days=120)
+
+        tgl_selanjutnya = next_date.strftime(
+            "%d-%m-%y"
+        )
+
+        row_final = [
+            nama_motor,
+            nama_mesin,
+            sub_mesin,
+            tgl_terakhir,
+            personil,
+            keterangan,
+            periode,
+            tgl_selanjutnya
+        ]
+
+        processed_data.append(
+            row_final
+        )
+
+        print(
+            f"   [PERBAIKAN] {nama_motor} | "
+            f"{nama_mesin} | {sub_mesin} | {tgl_terakhir}"
+        )
+
+    print(
+        f"3. TOTAL DATA PERBAIKAN: "
+        f"{len(processed_data)}"
     )
 
-    return all_data
+    return processed_data
 
 
 # ============================================================
-# 10. SINKRONISASI GOOGLE SHEETS
+# 12. GABUNGKAN DAN KIRIM KE GOOGLE SHEETS
 # ============================================================
 
 def send_to_google_sheets(all_data):
 
-    logger.info("=" * 60)
-    logger.info("MENGIRIM DATA KE GOOGLE SHEETS")
-    logger.info("=" * 60)
+    print("\n" + "=" * 60)
+    print("MENGIRIM DATA KE GOOGLE SHEETS")
+    print("=" * 60)
 
-    berkala_count = sum(
-        1 for row in all_data
-        if str(row[5]).upper() == "BERKALA"
+    if not all_data:
+
+        print(
+            "Tidak ada data dari kedua sumber."
+        )
+
+        return
+
+    print(
+        f"Total data gabungan: {len(all_data)}"
     )
 
-    perbaikan_count = sum(
+    count_berkala = sum(
         1 for row in all_data
-        if str(row[5]).upper() == "PERBAIKAN"
+        if len(row) > 5 and row[5] == "Berkala"
     )
 
-    payload = all_data
+    count_perbaikan = sum(
+        1 for row in all_data
+        if len(row) > 5 and row[5] == "Perbaikan"
+    )
 
-    report_progress(
-        85,
-        "Google Sheets",
-        "Mengirim data ke Google Sheets"
+    print(
+        f"Data Berkala   : {count_berkala}"
+    )
+
+    print(
+        f"Data Perbaikan : {count_perbaikan}"
+    )
+
+    print(
+        "Mengirim data ke Google Sheets..."
     )
 
     response = requests.post(
         APPS_SCRIPT_URL,
-        json=payload,
-        timeout=180
+        json=all_data,
+        timeout=120
     )
 
     response.raise_for_status()
 
-    result = response.text
-
-    logger.info(
-        "Respons Google Apps Script: %s",
-        result
+    print(
+        "Respon Google Sheets:",
+        response.text
     )
 
-    logger.info(
-        "Total Berkala: %s",
-        berkala_count
+    print(
+        "Sinkronisasi berhasil."
     )
-
-    logger.info(
-        "Total Perbaikan: %s",
-        perbaikan_count
-    )
-
-    return {
-        "response": result,
-        "total": len(all_data),
-        "berkala": berkala_count,
-        "perbaikan": perbaikan_count
-    }
 
 
 # ============================================================
-# 11. PROSES UTAMA
+# 13. PROGRAM UTAMA
 # ============================================================
 
 def run_scraper():
 
-    start_time = time.time()
+    print("\n")
 
-    try:
+    print("=" * 60)
+    print("SISTEM SCRAPER GABUNGAN MOTOR PMP")
+    print("=" * 60)
 
-        report_progress(
-            0,
-            "Persiapan",
-            "Scraper sedang dimulai"
+    date_from, date_to = get_date_range()
+
+    # --------------------------------------------------------
+    # SCRAPER JOB PMP
+    # --------------------------------------------------------
+
+    berkala_data = run_job_scraper(
+        date_from,
+        date_to
+    )
+
+    # --------------------------------------------------------
+    # SCRAPER APPSHEET
+    # --------------------------------------------------------
+
+    perbaikan_data = run_appsheet_scraper(
+        date_from,
+        date_to
+    )
+
+    # --------------------------------------------------------
+    # GABUNGKAN
+    # --------------------------------------------------------
+
+    combined_data = (
+        berkala_data + perbaikan_data
+    )
+
+    print("\n")
+
+    print("=" * 60)
+    print("REKAPITULASI SCRAPER")
+    print("=" * 60)
+
+    print(
+        f"Berkala   : {len(berkala_data)}"
+    )
+
+    print(
+        f"Perbaikan : {len(perbaikan_data)}"
+    )
+
+    print(
+        f"TOTAL     : {len(combined_data)}"
+    )
+
+    # --------------------------------------------------------
+    # TAMPILKAN PERINGATAN
+    # --------------------------------------------------------
+
+    if len(berkala_data) == 0:
+
+        print("\nPERINGATAN:")
+
+        print(
+            "Data dari Job PMP tidak berhasil diperoleh."
         )
 
-        date_from, date_to = get_date_range()
-
-        logger.info(
-            "Rentang tanggal: %s sampai %s",
-            date_from,
-            date_to
+        print(
+            "Periksa log login, tabel, header, dan filter tanggal."
         )
 
-        # ----------------------------------------------------
-        # JOB PMP
-        # ----------------------------------------------------
+    # --------------------------------------------------------
+    # KIRIM DATA
+    # --------------------------------------------------------
 
-        job_data = run_job_scraper(
-            date_from,
-            date_to
-        )
+    send_to_google_sheets(
+        combined_data
+    )
 
-        # ----------------------------------------------------
-        # APPSHEET
-        # ----------------------------------------------------
+    print("\n")
 
-        appsheet_data = run_appsheet_scraper(
-            date_from,
-            date_to
-        )
+    print("=" * 60)
+    print("SELURUH PROSES SELESAI")
+    print("=" * 60)
 
-        # ----------------------------------------------------
-        # GABUNG DATA
-        # ----------------------------------------------------
-
-        report_progress(
-            75,
-            "Penggabungan",
-            "Menggabungkan data Job PMP dan AppSheet"
-        )
-
-        all_data = (
-            job_data + appsheet_data
-        )
-
-        logger.info(
-            "Total data Job PMP: %s",
-            len(job_data)
-        )
-
-        logger.info(
-            "Total data AppSheet: %s",
-            len(appsheet_data)
-        )
-
-        logger.info(
-            "Total gabungan: %s",
-            len(all_data)
-        )
-
-        # ----------------------------------------------------
-        # HAPUS DUPLIKAT IDENTIK
-        # ----------------------------------------------------
-
-        unique_data = []
-        seen = set()
-
-        for row in all_data:
-
-            key = tuple(
-                str(value).strip().upper()
-                for value in row
-            )
-
-            if key in seen:
-                continue
-
-            seen.add(key)
-            unique_data.append(row)
-
-        all_data = unique_data
-
-        logger.info(
-            "Total setelah menghapus duplikat identik: %s",
-            len(all_data)
-        )
-
-        # ----------------------------------------------------
-        # KIRIM KE GOOGLE SHEETS
-        # ----------------------------------------------------
-
-        result = send_to_google_sheets(
-            all_data
-        )
-
-        elapsed = round(
-            time.time() - start_time,
-            2
-        )
-
-        logger.info("=" * 60)
-        logger.info("SCRAPER BERHASIL")
-        logger.info("Total data: %s", result["total"])
-        logger.info("Berkala: %s", result["berkala"])
-        logger.info("Perbaikan: %s", result["perbaikan"])
-        logger.info("Waktu: %s detik", elapsed)
-        logger.info("=" * 60)
-
-        report_progress(
-            100,
-            "Selesai",
-            (
-                "Scraper berhasil. Total "
-                + str(result["total"])
-                + " data. Berkala: "
-                + str(result["berkala"])
-                + ", Perbaikan: "
-                + str(result["perbaikan"])
-            ),
-            "completed"
-        )
-
-        return result
-
-    except Exception as error:
-
-        logger.exception(
-            "SCRAPER GAGAL: %s",
-            error
-        )
-
-        report_progress(
-            100,
-            "Gagal",
-            str(error),
-            "failed"
-        )
-
-        raise
-
-
-# ============================================================
-# 12. EKSEKUSI
-# ============================================================
 
 if __name__ == "__main__":
 
