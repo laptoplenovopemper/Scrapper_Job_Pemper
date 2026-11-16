@@ -1,3 +1,4 @@
+
 name: Run Daily Job Scraper
 
 on:
@@ -7,16 +8,19 @@ on:
         description: 'Tanggal Mulai (YYYY-MM-DD)'
         required: true
         type: string
+
       date_to:
         description: 'Tanggal Selesai (YYYY-MM-DD)'
         required: true
         type: string
+
   schedule:
     - cron: '0 0 * * *'
 
 jobs:
   run-scraper:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
@@ -28,14 +32,23 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install requests beautifulsoup4 gspread oauth2client selenium webdriver-manager
 
-      - name: Run Scraper Script
+      - name: Run Combined Scraper
         env:
+          # Login job.pmp.web.id
           SCRAPER_USERNAME: ${{ secrets.SCRAPER_USERNAME }}
           SCRAPER_PASSWORD: ${{ secrets.SCRAPER_PASSWORD }}
+
+          # AppSheet API
+          APPSHEET_APP_ID: ${{ secrets.APPSHEET_APP_ID }}
+          APPSHEET_ACCESS_KEY: ${{ secrets.APPSHEET_ACCESS_KEY }}
+
+          # Tanggal dari Web App
           INPUT_DATE_FROM: ${{ github.event.inputs.date_from }}
           INPUT_DATE_TO: ${{ github.event.inputs.date_to }}
+
         run: |
           python scraper.py
 
@@ -45,3 +58,4 @@ jobs:
         with:
           name: debug-screenshot
           path: debug_error.png
+          if-no-files-found: ignore
