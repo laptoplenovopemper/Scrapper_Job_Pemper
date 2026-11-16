@@ -46,8 +46,6 @@ PAGE_LOAD_TIMEOUT = 45
 ELEMENT_TIMEOUT = 20
 MAX_PAGES = 100
 
-# Fallback posisi kolom hanya digunakan jika header
-# tabel tidak berhasil dibaca sama sekali.
 ALLOW_FALLBACK_COLUMN = True
 
 
@@ -358,14 +356,8 @@ def normalize_header(text):
 def get_job_table_column_indices(driver):
 
     """
-    Membaca indeks kolom berdasarkan header tabel.
-
-    PENTING:
-    Personil hanya boleh diambil dari header PERSONIL.
-    Header PIC tidak boleh digunakan sebagai pengganti.
-
-    Fallback posisi lama hanya digunakan jika header
-    tabel sama sekali tidak berhasil dibaca.
+    Personil Job PMP hanya diambil dari kolom PERSONIL.
+    Kolom PIC tidak digunakan sebagai alternatif.
     """
 
     fallback_indices = {
@@ -419,8 +411,8 @@ def get_job_table_column_indices(driver):
                     "aktivitas"
                 ],
 
-                # PIC SENGAJA DIHAPUS
-                # Hanya kolom Personil yang digunakan.
+                # KHUSUS HEADER PERSONIL
+                # Tidak menggunakan PIC.
                 "personil": [
                     "personil"
                 ],
@@ -463,8 +455,6 @@ def get_job_table_column_indices(driver):
                         found += 1
                         break
 
-            # Jika header berhasil dibaca, jangan otomatis
-            # menggunakan PIC atau indeks personil cadangan.
             if found > 0:
 
                 print(
@@ -484,8 +474,8 @@ def get_job_table_column_indices(driver):
                     )
 
                     print(
-                        "   Data personil akan dikosongkan, "
-                        "bukan mengambil kolom PIC."
+                        "   Data personil dikosongkan. "
+                        "Kolom PIC tidak digunakan."
                     )
 
                 return indices
@@ -694,10 +684,7 @@ def run_job_scraper(date_from, date_to):
             ELEMENT_TIMEOUT
         )
 
-        # ----------------------------------------------------
         # LOGIN
-        # ----------------------------------------------------
-
         print("2. Membuka halaman login...")
 
         driver.get(LOGIN_URL)
@@ -756,10 +743,7 @@ def run_job_scraper(date_from, date_to):
 
         print("   Login berhasil atau sesi sudah aktif.")
 
-        # ----------------------------------------------------
         # BUKA DASHBOARD
-        # ----------------------------------------------------
-
         print("3. Mengakses dashboard Job PMP...")
 
         print(
@@ -813,10 +797,7 @@ def run_job_scraper(date_from, date_to):
             driver
         )
 
-        # ----------------------------------------------------
         # PROSES PAGINATION
-        # ----------------------------------------------------
-
         page_num = 1
         visited_pages = set()
 
@@ -888,10 +869,7 @@ def run_job_scraper(date_from, date_to):
                     if not col_data or not any(col_data):
                         continue
 
-                    # ----------------------------------------
                     # AMBIL NAMA PEKERJAAN
-                    # ----------------------------------------
-
                     raw_job = get_cell_value(
                         col_data,
                         column_indices.get("job")
@@ -910,10 +888,7 @@ def run_job_scraper(date_from, date_to):
                     if not raw_job:
                         continue
 
-                    # ----------------------------------------
                     # AMBIL TANGGAL DAN STATUS DONE
-                    # ----------------------------------------
-
                     jadwal_teks = get_cell_value(
                         col_data,
                         column_indices.get("jadwal")
@@ -953,24 +928,18 @@ def run_job_scraper(date_from, date_to):
 
                         print(
                             f"   Baris {row_number}: "
-                            f"tanggal Done tidak ditemukan."
+                            "tanggal Done tidak ditemukan."
                         )
 
                         continue
 
-                    # ----------------------------------------
                     # FILTER RENTANG TANGGAL
-                    # ----------------------------------------
-
                     if not (
                         date_from <= dt_obj.date() <= date_to
                     ):
                         continue
 
-                    # ----------------------------------------
                     # AMBIL MESIN
-                    # ----------------------------------------
-
                     mesin_teks = get_cell_value(
                         col_data,
                         column_indices.get("mesin")
@@ -986,10 +955,7 @@ def run_job_scraper(date_from, date_to):
                         mesin_teks
                     )
 
-                    # ----------------------------------------
                     # AMBIL SUB MESIN
-                    # ----------------------------------------
-
                     sub_mesin_teks = get_cell_value(
                         col_data,
                         column_indices.get("sub_mesin")
@@ -999,11 +965,8 @@ def run_job_scraper(date_from, date_to):
                         sub_mesin_teks
                     )
 
-                    # ----------------------------------------
-                    # AMBIL PERSONIL
-                    # KHUSUS KOLOM PERSONIL, BUKAN PIC
-                    # ----------------------------------------
-
+                    # PERSONIL JOB PMP: KOLOM PERSONIL
+                    # TIDAK MENGGUNAKAN KOLOM PIC
                     personil_index = column_indices.get(
                         "personil"
                     )
@@ -1020,10 +983,7 @@ def run_job_scraper(date_from, date_to):
                             "kolom Personil kosong/tidak ditemukan."
                         )
 
-                    # ----------------------------------------
                     # NAMA MOTOR
-                    # ----------------------------------------
-
                     nama_motor = clean_motor_name(
                         raw_job
                     )
@@ -1031,10 +991,7 @@ def run_job_scraper(date_from, date_to):
                     if not nama_motor:
                         continue
 
-                    # ----------------------------------------
                     # DATA BERKALA
-                    # ----------------------------------------
-
                     keterangan = "Berkala"
                     periode = "120"
 
@@ -1081,10 +1038,7 @@ def run_job_scraper(date_from, date_to):
                 f"{page_added}"
             )
 
-            # ------------------------------------------------
             # CARI TOMBOL HALAMAN BERIKUTNYA
-            # ------------------------------------------------
-
             next_button = None
 
             next_xpaths = [
@@ -1131,10 +1085,7 @@ def run_job_scraper(date_from, date_to):
 
                 break
 
-            # ------------------------------------------------
             # PERIKSA TOMBOL DISABLED
-            # ------------------------------------------------
-
             try:
 
                 parent = next_button.find_element(
@@ -1164,10 +1115,7 @@ def run_job_scraper(date_from, date_to):
             except Exception:
                 pass
 
-            # ------------------------------------------------
             # PINDAH HALAMAN
-            # ------------------------------------------------
-
             try:
 
                 old_url = driver.current_url
@@ -1206,10 +1154,7 @@ def run_job_scraper(date_from, date_to):
 
                 break
 
-        # ----------------------------------------------------
         # RINGKASAN
-        # ----------------------------------------------------
-
         print("\n========================================")
 
         print(
@@ -1280,6 +1225,41 @@ def run_job_scraper(date_from, date_to):
 # 11. SCRAPER KEDUA: APPSHEET
 # ============================================================
 
+def normalize_appsheet_column_name(name):
+
+    """
+    Menyamakan format nama kolom AppSheet.
+    Contoh:
+    'PIC', 'pic', ' PIC ' menjadi 'pic'.
+    """
+
+    return re.sub(
+        r'\s+',
+        ' ',
+        str(name or '').strip()
+    ).lower()
+
+
+def get_appsheet_value(item, column_name):
+
+    """
+    Mengambil nilai berdasarkan nama kolom AppSheet
+    tanpa mempermasalahkan kapitalisasi atau spasi.
+    """
+
+    target = normalize_appsheet_column_name(
+        column_name
+    )
+
+    for key, value in item.items():
+
+        if normalize_appsheet_column_name(key) == target:
+
+            return value
+
+    return ""
+
+
 def run_appsheet_scraper(date_from, date_to):
 
     print("\n" + "=" * 60)
@@ -1348,6 +1328,27 @@ def run_appsheet_scraper(date_from, date_to):
         f"{len(rows)}"
     )
 
+    # DEBUG NAMA KOLOM
+    if rows and isinstance(rows[0], dict):
+
+        print(
+            "   Kolom AppSheet yang diterima:",
+            list(rows[0].keys())
+        )
+
+        if get_appsheet_value(rows[0], "PIC") == "":
+
+            print(
+                "   PERINGATAN: Kolom PIC tidak ditemukan "
+                "atau nilainya kosong pada baris pertama."
+            )
+
+        else:
+
+            print(
+                "   Sumber personil AppSheet: kolom PIC."
+            )
+
     processed_data = []
 
     for item in rows:
@@ -1356,15 +1357,23 @@ def run_appsheet_scraper(date_from, date_to):
             continue
 
         detail_pekerjaan = str(
-            item.get("Detil Pekerjaan", "") or ""
+            get_appsheet_value(
+                item,
+                "Detil Pekerjaan"
+            ) or ""
         ).strip()
 
         if SEARCH_KEYWORD.lower() not in detail_pekerjaan.lower():
             continue
 
-        raw_date = item.get("Tanggal", "")
+        raw_date = get_appsheet_value(
+            item,
+            "Tanggal"
+        )
 
-        tanggal_obj = parse_appsheet_date(raw_date)
+        tanggal_obj = parse_appsheet_date(
+            raw_date
+        )
 
         if tanggal_obj is None:
             continue
@@ -1388,7 +1397,10 @@ def run_appsheet_scraper(date_from, date_to):
             continue
 
         mesin = str(
-            item.get("Mesin", "") or ""
+            get_appsheet_value(
+                item,
+                "Mesin"
+            ) or ""
         ).strip()
 
         nama_mesin = normalize_machine_name(
@@ -1396,14 +1408,30 @@ def run_appsheet_scraper(date_from, date_to):
         )
 
         sub_mesin = normalize_sub_machine(
-            item.get("Sub Mesin", "")
+            get_appsheet_value(
+                item,
+                "Sub Mesin"
+            )
         )
 
-        # HANYA MENGAMBIL KOLOM PERSONIL
-        # Tidak menggunakan PIC atau Nama sebagai alternatif.
+        # ====================================================
+        # PERSONIL APPSHEET: AMBIL DARI KOLOM PIC
+        # BUKAN DARI KOLOM PERSONIL
+        # ====================================================
+
         personil = str(
-            item.get("Personil", "") or ""
+            get_appsheet_value(
+                item,
+                "PIC"
+            ) or ""
         ).strip()
+
+        if not personil:
+
+            print(
+                f"   PERINGATAN: PIC kosong untuk pekerjaan "
+                f"{nama_motor}."
+            )
 
         tgl_terakhir = tanggal_obj.strftime(
             "%d-%m-%y"
@@ -1436,7 +1464,7 @@ def run_appsheet_scraper(date_from, date_to):
         print(
             f"   [PERBAIKAN] {nama_motor} | "
             f"{nama_mesin} | {sub_mesin} | "
-            f"{tgl_terakhir} | Personil: {personil}"
+            f"{tgl_terakhir} | Personil (PIC): {personil}"
         )
 
     print(
@@ -1523,28 +1551,19 @@ def run_scraper():
 
     date_from, date_to = get_date_range()
 
-    # --------------------------------------------------------
     # SCRAPER JOB PMP
-    # --------------------------------------------------------
-
     berkala_data = run_job_scraper(
         date_from,
         date_to
     )
 
-    # --------------------------------------------------------
     # SCRAPER APPSHEET
-    # --------------------------------------------------------
-
     perbaikan_data = run_appsheet_scraper(
         date_from,
         date_to
     )
 
-    # --------------------------------------------------------
     # GABUNGKAN
-    # --------------------------------------------------------
-
     combined_data = (
         berkala_data + perbaikan_data
     )
@@ -1567,10 +1586,7 @@ def run_scraper():
         f"TOTAL     : {len(combined_data)}"
     )
 
-    # --------------------------------------------------------
-    # TAMPILKAN PERINGATAN
-    # --------------------------------------------------------
-
+    # PERINGATAN
     if len(berkala_data) == 0:
 
         print("\nPERINGATAN:")
@@ -1583,10 +1599,7 @@ def run_scraper():
             "Periksa log login, tabel, header, dan filter tanggal."
         )
 
-    # --------------------------------------------------------
     # KIRIM DATA
-    # --------------------------------------------------------
-
     send_to_google_sheets(
         combined_data
     )
