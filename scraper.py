@@ -48,9 +48,105 @@ MAX_PAGES = 100
 
 ALLOW_FALLBACK_COLUMN = True
 
+# ID harus sama dengan run_id yang dikembalikan oleh
+# action trigger_scraper pada Apps Script.
+#
+# INPUT_RUN_ID dapat diberikan melalui workflow input.
+# Jika tidak tersedia, gunakan GITHUB_RUN_ID dari GitHub Actions.
+RUN_ID = (
+    os.getenv("INPUT_RUN_ID", "").strip()
+    or os.getenv("GITHUB_RUN_ID", "").strip()
+)
+
+if not RUN_ID:
+    RUN_ID = (
+        "LOCAL-"
+        + datetime.now(TIMEZONE).strftime("%Y%m%d%H%M%S")
+    )
+    print(
+        "PERINGATAN: INPUT_RUN_ID dan GITHUB_RUN_ID tidak ditemukan. "
+        "Menggunakan RUN_ID lokal:",
+        RUN_ID
+    )
+
 
 # ============================================================
-# 2. RENTANG TANGGAL
+# 2. SISTEM PROGRESS BAR
+# ============================================================
+
+_last_progress = -1
+_last_message = ""
+
+
+def update_progress(
+    progress,
+    message,
+    status="running",
+    error=""
+):
+    """
+    Mengirim progres scraper ke Apps Script.
+
+    Format yang dikirim:
+    {
+        "action": "update_scraper_progress",
+        "run_id": "...",
+        "status": "running",
+        "progress": 35,
+        "message": "Memproses data...",
+        "error": ""
+    }
+
+    Kegagalan mengirim progress tidak menghentikan scraper.
+    """
+
+    global _last_progress, _last_message
+
+    try:
+        progress = int(progress)
+        progress = max(0, min(100, progress))
+
+        payload = {
+            "action": "update_scraper_progress",
+            "run_id": str(RUN_ID),
+            "status": status,
+            "progress": progress,
+            "message": str(message),
+            "error": str(error or "")
+        }
+
+        # Hindari pengiriman berulang jika angka dan pesan sama.
+        if (
+            status == "running"
+            and progress == _last_progress
+            and message == _last_message
+        ):
+            return
+
+        print(
+            f"[PROGRESS {progress}%] {status.upper()} - {message}"
+        )
+
+        response = requests.post(
+            APPS_SCRIPT_URL,
+            json=payload,
+            timeout=30
+        )
+
+        response.raise_for_status()
+
+        _last_progress = progress
+        _last_message = message
+
+    except Exception as e:
+        print(
+            "[PERINGATAN PROGRESS] Gagal mengirim progres ke Apps Script:",
+            str(e)
+        )
+
+
+# ============================================================
+# 3. RENTANG TANGGAL
 # ============================================================
 
 def get_date_range():
@@ -99,7 +195,7 @@ def get_date_range():
 
 
 # ============================================================
-# 3. KONVERSI TANGGAL
+# 4. KONVERSI TANGGAL
 # ============================================================
 
 def universal_date_converter(date_str):
@@ -243,7 +339,7 @@ def parse_appsheet_date(value):
 
 
 # ============================================================
-# 4. PEMBERSIHAN NAMA MOTOR
+# 5. PEMBERSIHAN NAMA MOTOR
 # ============================================================
 
 def clean_motor_name(raw_text):
@@ -270,7 +366,7 @@ def clean_motor_name(raw_text):
 
 
 # ============================================================
-# 5. EKSTRAKSI NAMA MOTOR DARI DETAIL PEKERJAAN APPSHEET
+# 6. EKSTRAKSI NAMA MOTOR DARI DETAIL PEKERJAAN APPSHEET
 # ============================================================
 
 def extract_motor_from_detail(detail_pekerjaan):
@@ -302,7 +398,7 @@ def extract_motor_from_detail(detail_pekerjaan):
 
 
 # ============================================================
-# 6. NORMALISASI NAMA MESIN
+# 7. NORMALISASI NAMA MESIN
 # ============================================================
 
 def normalize_machine_name(raw_machine):
@@ -325,7 +421,7 @@ def normalize_machine_name(raw_machine):
 
 
 # ============================================================
-# 7. NORMALISASI SUB MESIN
+# 8. NORMALISASI SUB MESIN
 # ============================================================
 
 def normalize_sub_machine(raw_sub_machine):
@@ -341,7 +437,7 @@ def normalize_sub_machine(raw_sub_machine):
 
 
 # ============================================================
-# 8. MEMBACA HEADER TABEL JOB.PMP
+# 9. MEMBACA HEADER TABEL JOB.PMP
 # ============================================================
 
 def normalize_header(text):
@@ -411,8 +507,6 @@ def get_job_table_column_indices(driver):
                     "aktivitas"
                 ],
 
-                # KHUSUS HEADER PERSONIL
-                # Tidak menggunakan PIC.
                 "personil": [
                     "personil"
                 ],
@@ -521,7 +615,7 @@ def get_job_table_column_indices(driver):
 
 
 # ============================================================
-# 9. FUNGSI BANTU SCRAPER JOB PMP
+# 10. FUNGSI BANTU SCRAPER JOB PMP
 # ============================================================
 
 def get_cell_value(col_data, index):
@@ -612,7 +706,7 @@ def save_debug_screenshot(driver, filename="job_pmp_debug.png"):
 
 
 # ============================================================
-# 10. SCRAPER PERTAMA: JOB.PMP.WEB.ID
+# 11. SCRAPER PERTAMA: JOB.PMP.WEB.ID
 # ============================================================
 
 def run_job_scraper(date_from, date_to):
@@ -652,6 +746,11 @@ def run_job_scraper(date_from, date_to):
                 "Periksa Secrets GitHub Actions."
             )
 
+        update_progress(
+            5,
+            "Menyiapkan browser untuk mengambil data Job PMP."
+        )
+
         print("1. Menyiapkan Chrome...")
 
         options = Options()
@@ -685,6 +784,11 @@ def run_job_scraper(date_from, date_to):
         )
 
         # LOGIN
+        update_progress(
+            8,
+            "Membuka halaman login Job PMP."
+        )
+
         print("2. Membuka halaman login...")
 
         driver.get(LOGIN_URL)
@@ -743,6 +847,11 @@ def run_job_scraper(date_from, date_to):
 
         print("   Login berhasil atau sesi sudah aktif.")
 
+        update_progress(
+            12,
+            "Login Job PMP berhasil. Mengakses dashboard."
+        )
+
         # BUKA DASHBOARD
         print("3. Mengakses dashboard Job PMP...")
 
@@ -797,6 +906,11 @@ def run_job_scraper(date_from, date_to):
             driver
         )
 
+        update_progress(
+            15,
+            "Dashboard Job PMP siap. Mulai mengambil data."
+        )
+
         # PROSES PAGINATION
         page_num = 1
         visited_pages = set()
@@ -810,6 +924,11 @@ def run_job_scraper(date_from, date_to):
             )
 
             print("----------------------------------------")
+
+            update_progress(
+                15,
+                f"Sedang memproses halaman Job PMP ke-{page_num}."
+            )
 
             time.sleep(1)
 
@@ -1177,6 +1296,12 @@ def run_job_scraper(date_from, date_to):
 
             save_debug_screenshot(driver)
 
+        update_progress(
+            40,
+            f"Pengambilan data Job PMP selesai. "
+            f"{len(processed_data)} data berkala ditemukan."
+        )
+
     except Exception as e:
 
         print("\n[ERROR JOB.PMP.WEB.ID]")
@@ -1185,6 +1310,12 @@ def run_job_scraper(date_from, date_to):
             type(e).__name__,
             ":",
             str(e)
+        )
+
+        update_progress(
+            40,
+            "Pengambilan data Job PMP mengalami kendala. "
+            "Melanjutkan proses berikutnya jika memungkinkan."
         )
 
         if driver:
@@ -1222,7 +1353,7 @@ def run_job_scraper(date_from, date_to):
 
 
 # ============================================================
-# 11. SCRAPER KEDUA: APPSHEET
+# 12. SCRAPER KEDUA: APPSHEET
 # ============================================================
 
 def normalize_appsheet_column_name(name):
@@ -1271,6 +1402,11 @@ def run_appsheet_scraper(date_from, date_to):
         raise ValueError(
             "APPSHEET_APP_ID atau APPSHEET_ACCESS_KEY belum tersedia."
         )
+
+    update_progress(
+        42,
+        "Menghubungi API AppSheet untuk mengambil data perbaikan."
+    )
 
     api_url = (
         f"https://api.appsheet.com/api/v2/apps/"
@@ -1323,9 +1459,16 @@ def run_appsheet_scraper(date_from, date_to):
             "Format respons API AppSheet tidak sesuai."
         )
 
+    total_rows = len(rows)
+
     print(
         f"2. Total baris diterima dari AppSheet: "
-        f"{len(rows)}"
+        f"{total_rows}"
+    )
+
+    update_progress(
+        48,
+        f"Data AppSheet diterima. Memeriksa {total_rows} baris."
     )
 
     # DEBUG NAMA KOLOM
@@ -1351,132 +1494,176 @@ def run_appsheet_scraper(date_from, date_to):
 
     processed_data = []
 
-    for item in rows:
+    # Progress AppSheet berada pada rentang 48% sampai 75%.
+    # Perhitungannya berdasarkan jumlah baris yang diperiksa.
+    last_reported_progress = 48
 
-        if not isinstance(item, dict):
-            continue
+    for index, item in enumerate(rows, start=1):
 
-        detail_pekerjaan = str(
-            get_appsheet_value(
+        try:
+
+            if not isinstance(item, dict):
+                continue
+
+            detail_pekerjaan = str(
+                get_appsheet_value(
+                    item,
+                    "Detil Pekerjaan"
+                ) or ""
+            ).strip()
+
+            if SEARCH_KEYWORD.lower() not in detail_pekerjaan.lower():
+                continue
+
+            raw_date = get_appsheet_value(
                 item,
-                "Detil Pekerjaan"
-            ) or ""
-        ).strip()
+                "Tanggal"
+            )
 
-        if SEARCH_KEYWORD.lower() not in detail_pekerjaan.lower():
-            continue
+            tanggal_obj = parse_appsheet_date(
+                raw_date
+            )
 
-        raw_date = get_appsheet_value(
-            item,
-            "Tanggal"
-        )
+            if tanggal_obj is None:
+                continue
 
-        tanggal_obj = parse_appsheet_date(
-            raw_date
-        )
+            if not (
+                date_from <= tanggal_obj <= date_to
+            ):
+                continue
 
-        if tanggal_obj is None:
-            continue
+            nama_motor = extract_motor_from_detail(
+                detail_pekerjaan
+            )
 
-        if not (
-            date_from <= tanggal_obj <= date_to
-        ):
-            continue
+            if not nama_motor:
 
-        nama_motor = extract_motor_from_detail(
-            detail_pekerjaan
-        )
+                print(
+                    "   Melewati data karena nama motor "
+                    "tidak ditemukan setelah Ganti Motor."
+                )
 
-        if not nama_motor:
+                continue
+
+            mesin = str(
+                get_appsheet_value(
+                    item,
+                    "Mesin"
+                ) or ""
+            ).strip()
+
+            nama_mesin = normalize_machine_name(
+                mesin
+            )
+
+            sub_mesin = normalize_sub_machine(
+                get_appsheet_value(
+                    item,
+                    "Sub Mesin"
+                )
+            )
+
+            # PERSONIL APPSHEET: AMBIL DARI KOLOM PIC
+            # BUKAN DARI KOLOM PERSONIL
+
+            personil = str(
+                get_appsheet_value(
+                    item,
+                    "PIC"
+                ) or ""
+            ).strip()
+
+            if not personil:
+
+                print(
+                    f"   PERINGATAN: PIC kosong untuk pekerjaan "
+                    f"{nama_motor}."
+                )
+
+            tgl_terakhir = tanggal_obj.strftime(
+                "%d-%m-%y"
+            )
+
+            keterangan = "Perbaikan"
+            periode = "120"
+
+            next_date = tanggal_obj + timedelta(days=120)
+
+            tgl_selanjutnya = next_date.strftime(
+                "%d-%m-%y"
+            )
+
+            row_final = [
+                nama_motor,
+                nama_mesin,
+                sub_mesin,
+                tgl_terakhir,
+                personil,
+                keterangan,
+                periode,
+                tgl_selanjutnya
+            ]
+
+            processed_data.append(
+                row_final
+            )
 
             print(
-                "   Melewati data karena nama motor "
-                "tidak ditemukan setelah Ganti Motor."
+                f"   [PERBAIKAN] {nama_motor} | "
+                f"{nama_mesin} | {sub_mesin} | "
+                f"{tgl_terakhir} | Personil (PIC): {personil}"
+            )
+
+        except Exception as row_error:
+
+            print(
+                f"   ERROR baris AppSheet {index}:",
+                str(row_error)
             )
 
             continue
 
-        mesin = str(
-            get_appsheet_value(
-                item,
-                "Mesin"
-            ) or ""
-        ).strip()
+        finally:
 
-        nama_mesin = normalize_machine_name(
-            mesin
-        )
+            # Kirim progress secara berkala agar tidak terlalu
+            # sering melakukan request ke Apps Script.
+            if total_rows > 0:
 
-        sub_mesin = normalize_sub_machine(
-            get_appsheet_value(
-                item,
-                "Sub Mesin"
-            )
-        )
+                current_progress = (
+                    48 + int((index / total_rows) * 27)
+                )
 
-        # ====================================================
-        # PERSONIL APPSHEET: AMBIL DARI KOLOM PIC
-        # BUKAN DARI KOLOM PERSONIL
-        # ====================================================
+                should_report = (
+                    current_progress != last_reported_progress
+                    or index == total_rows
+                )
 
-        personil = str(
-            get_appsheet_value(
-                item,
-                "PIC"
-            ) or ""
-        ).strip()
+                if should_report:
 
-        if not personil:
+                    update_progress(
+                        current_progress,
+                        f"Memeriksa data AppSheet: "
+                        f"{index}/{total_rows} baris."
+                    )
 
-            print(
-                f"   PERINGATAN: PIC kosong untuk pekerjaan "
-                f"{nama_motor}."
-            )
-
-        tgl_terakhir = tanggal_obj.strftime(
-            "%d-%m-%y"
-        )
-
-        keterangan = "Perbaikan"
-        periode = "120"
-
-        next_date = tanggal_obj + timedelta(days=120)
-
-        tgl_selanjutnya = next_date.strftime(
-            "%d-%m-%y"
-        )
-
-        row_final = [
-            nama_motor,
-            nama_mesin,
-            sub_mesin,
-            tgl_terakhir,
-            personil,
-            keterangan,
-            periode,
-            tgl_selanjutnya
-        ]
-
-        processed_data.append(
-            row_final
-        )
-
-        print(
-            f"   [PERBAIKAN] {nama_motor} | "
-            f"{nama_mesin} | {sub_mesin} | "
-            f"{tgl_terakhir} | Personil (PIC): {personil}"
-        )
+                    last_reported_progress = current_progress
 
     print(
         f"3. TOTAL DATA PERBAIKAN: "
         f"{len(processed_data)}"
     )
 
+    update_progress(
+        75,
+        f"Pemeriksaan AppSheet selesai. "
+        f"{len(processed_data)} data perbaikan ditemukan."
+    )
+
     return processed_data
 
 
 # ============================================================
-# 12. GABUNGKAN DAN KIRIM KE GOOGLE SHEETS
+# 13. GABUNGKAN DAN KIRIM KE GOOGLE SHEETS
 # ============================================================
 
 def send_to_google_sheets(all_data):
@@ -1489,6 +1676,11 @@ def send_to_google_sheets(all_data):
 
         print(
             "Tidak ada data dari kedua sumber."
+        )
+
+        update_progress(
+            95,
+            "Tidak ada data baru untuk dikirim ke Google Sheets."
         )
 
         return
@@ -1515,8 +1707,18 @@ def send_to_google_sheets(all_data):
         f"Data Perbaikan : {count_perbaikan}"
     )
 
+    update_progress(
+        85,
+        f"Data berhasil digabungkan. Total {len(all_data)} baris."
+    )
+
     print(
         "Mengirim data ke Google Sheets..."
+    )
+
+    update_progress(
+        90,
+        "Mengirim data ke Google Sheets."
     )
 
     response = requests.post(
@@ -1536,9 +1738,14 @@ def send_to_google_sheets(all_data):
         "Sinkronisasi berhasil."
     )
 
+    update_progress(
+        97,
+        "Data berhasil dikirim ke Google Sheets."
+    )
+
 
 # ============================================================
-# 13. PROGRAM UTAMA
+# 14. PROGRAM UTAMA
 # ============================================================
 
 def run_scraper():
@@ -1549,67 +1756,135 @@ def run_scraper():
     print("SISTEM SCRAPER GABUNGAN MOTOR PMP")
     print("=" * 60)
 
-    date_from, date_to = get_date_range()
-
-    # SCRAPER JOB PMP
-    berkala_data = run_job_scraper(
-        date_from,
-        date_to
-    )
-
-    # SCRAPER APPSHEET
-    perbaikan_data = run_appsheet_scraper(
-        date_from,
-        date_to
-    )
-
-    # GABUNGKAN
-    combined_data = (
-        berkala_data + perbaikan_data
-    )
-
-    print("\n")
-
-    print("=" * 60)
-    print("REKAPITULASI SCRAPER")
-    print("=" * 60)
-
     print(
-        f"Berkala   : {len(berkala_data)}"
+        "RUN ID:",
+        RUN_ID
     )
 
-    print(
-        f"Perbaikan : {len(perbaikan_data)}"
-    )
+    try:
 
-    print(
-        f"TOTAL     : {len(combined_data)}"
-    )
+        update_progress(
+            1,
+            "Scraper dimulai. Menyiapkan proses pengambilan data."
+        )
 
-    # PERINGATAN
-    if len(berkala_data) == 0:
+        date_from, date_to = get_date_range()
 
-        print("\nPERINGATAN:")
+        update_progress(
+            3,
+            f"Rentang tanggal: {date_from} sampai {date_to}."
+        )
+
+        # ----------------------------------------------------
+        # SCRAPER JOB PMP
+        # ----------------------------------------------------
+
+        berkala_data = run_job_scraper(
+            date_from,
+            date_to
+        )
+
+        # ----------------------------------------------------
+        # SCRAPER APPSHEET
+        # ----------------------------------------------------
+
+        perbaikan_data = run_appsheet_scraper(
+            date_from,
+            date_to
+        )
+
+        # ----------------------------------------------------
+        # GABUNGKAN
+        # ----------------------------------------------------
+
+        combined_data = (
+            berkala_data + perbaikan_data
+        )
+
+        print("\n")
+
+        print("=" * 60)
+        print("REKAPITULASI SCRAPER")
+        print("=" * 60)
 
         print(
-            "Data dari Job PMP tidak berhasil diperoleh."
+            f"Berkala   : {len(berkala_data)}"
         )
 
         print(
-            "Periksa log login, tabel, header, dan filter tanggal."
+            f"Perbaikan : {len(perbaikan_data)}"
         )
 
-    # KIRIM DATA
-    send_to_google_sheets(
-        combined_data
-    )
+        print(
+            f"TOTAL     : {len(combined_data)}"
+        )
 
-    print("\n")
+        update_progress(
+            80,
+            f"Penggabungan data selesai. "
+            f"Total {len(combined_data)} data."
+        )
 
-    print("=" * 60)
-    print("SELURUH PROSES SELESAI")
-    print("=" * 60)
+        # PERINGATAN
+        if len(berkala_data) == 0:
 
+            print("\nPERINGATAN:")
+
+            print(
+                "Data dari Job PMP tidak berhasil diperoleh."
+            )
+
+            print(
+                "Periksa log login, tabel, header, dan filter tanggal."
+            )
+
+        # ----------------------------------------------------
+        # KIRIM DATA
+        # ----------------------------------------------------
+
+        send_to_google_sheets(
+            combined_data
+        )
+
+        print("\n")
+
+        print("=" * 60)
+        print("SELURUH PROSES SELESAI")
+        print("=" * 60)
+
+        update_progress(
+            100,
+            "Seluruh proses scraper berhasil diselesaikan.",
+            status="completed"
+        )
+
+    except Exception as e:
+
+        error_message = (
+            f"{type(e).__name__}: {str(e)}"
+        )
+
+        print("\n")
+        print("=" * 60)
+        print("SCRAPER GAGAL")
+        print("=" * 60)
+        print(error_message)
+
+        update_progress(
+            _last_progress if _last_progress >= 0 else 0,
+            "Scraper gagal: " + error_message,
+            status="failed",
+            error=error_message
+        )
+
+        # Lempar kembali error agar GitHub Actions
+        # juga mencatat workflow sebagai gagal.
+        raise
+
+
+# ============================================================
+# 15. EKSEKUSI PROGRAM
+# ============================================================
 
 if __name__ == "__main__":
 
