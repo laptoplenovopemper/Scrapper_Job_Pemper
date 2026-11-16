@@ -1,3 +1,4 @@
+
 import os
 import re
 import time
@@ -21,7 +22,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 # ============================================================
 
 LOGIN_URL = "http://job.pmp.web.id/login/"
-
 BASE_URL = "http://job.pmp.web.id/"
 
 APPS_SCRIPT_URL = (
@@ -41,14 +41,13 @@ SEARCH_KEYWORD = "Ganti Motor"
 
 TIMEZONE = ZoneInfo("Asia/Jakarta")
 
-# Pengaturan browser
 HEADLESS = True
 PAGE_LOAD_TIMEOUT = 45
 ELEMENT_TIMEOUT = 20
 MAX_PAGES = 100
 
-# Jika True, data Job PMP tetap dicoba diambil meskipun
-# header tabel tidak berhasil dibaca.
+# Fallback posisi kolom hanya digunakan jika header
+# tabel tidak berhasil dibaca sama sekali.
 ALLOW_FALLBACK_COLUMN = True
 
 
@@ -93,6 +92,7 @@ def get_date_range():
         )
 
     if date_from > date_to:
+
         raise ValueError(
             "Tanggal mulai tidak boleh lebih besar dari tanggal selesai."
         )
@@ -358,19 +358,17 @@ def normalize_header(text):
 def get_job_table_column_indices(driver):
 
     """
-    Mencari header tabel berdasarkan nama kolom.
+    Membaca indeks kolom berdasarkan header tabel.
 
-    Fallback posisi lama:
-    Job       = 1
-    Personil  = 3
-    Mesin     = 5
-    Jadwal    = 9
+    PENTING:
+    Personil hanya boleh diambil dari header PERSONIL.
+    Header PIC tidak boleh digunakan sebagai pengganti.
 
-    Sub Mesin tidak ditebak posisinya.
-    Jika tidak ditemukan, nilainya dikosongkan.
+    Fallback posisi lama hanya digunakan jika header
+    tabel sama sekali tidak berhasil dibaca.
     """
 
-    indices = {
+    fallback_indices = {
         "job": 1,
         "personil": 3,
         "mesin": 5,
@@ -412,6 +410,7 @@ def get_job_table_column_indices(driver):
                     header_map[key] = index
 
             aliases = {
+
                 "job": [
                     "pekerjaan",
                     "detailpekerjaan",
@@ -419,20 +418,23 @@ def get_job_table_column_indices(driver):
                     "job",
                     "aktivitas"
                 ],
+
+                # PIC SENGAJA DIHAPUS
+                # Hanya kolom Personil yang digunakan.
                 "personil": [
-                    "pic",
-                    "personil",
-                    "nama",
-                    "pelaksana"
+                    "personil"
                 ],
+
                 "mesin": [
                     "mesin",
                     "namamesin"
                 ],
+
                 "sub_mesin": [
                     "submesin",
                     "namasubmesin"
                 ],
+
                 "jadwal": [
                     "jadwal",
                     "tanggal",
@@ -442,6 +444,14 @@ def get_job_table_column_indices(driver):
             }
 
             found = 0
+
+            indices = {
+                "job": None,
+                "personil": None,
+                "mesin": None,
+                "jadwal": None,
+                "sub_mesin": None
+            }
 
             for field, names in aliases.items():
 
@@ -453,6 +463,8 @@ def get_job_table_column_indices(driver):
                         found += 1
                         break
 
+            # Jika header berhasil dibaca, jangan otomatis
+            # menggunakan PIC atau indeks personil cadangan.
             if found > 0:
 
                 print(
@@ -465,16 +477,39 @@ def get_job_table_column_indices(driver):
                     indices
                 )
 
+                if indices["personil"] is None:
+
+                    print(
+                        "   PERINGATAN: Header Personil tidak ditemukan."
+                    )
+
+                    print(
+                        "   Data personil akan dikosongkan, "
+                        "bukan mengambil kolom PIC."
+                    )
+
                 return indices
 
         print(
             "   PERINGATAN: Header tabel tidak ditemukan."
         )
 
-        print(
-            "   Menggunakan posisi kolom cadangan:",
-            indices
-        )
+        if ALLOW_FALLBACK_COLUMN:
+
+            print(
+                "   Menggunakan posisi kolom cadangan:",
+                fallback_indices
+            )
+
+            return fallback_indices.copy()
+
+        return {
+            "job": None,
+            "personil": None,
+            "mesin": None,
+            "jadwal": None,
+            "sub_mesin": None
+        }
 
     except Exception as e:
 
@@ -483,7 +518,16 @@ def get_job_table_column_indices(driver):
             str(e)
         )
 
-    return indices
+        if ALLOW_FALLBACK_COLUMN:
+            return fallback_indices.copy()
+
+        return {
+            "job": None,
+            "personil": None,
+            "mesin": None,
+            "jadwal": None,
+            "sub_mesin": None
+        }
 
 
 # ============================================================
@@ -502,11 +546,6 @@ def get_cell_value(col_data, index):
 
 
 def find_date_done_in_row(col_data):
-
-    """
-    Mencari sel yang berisi tanggal dan status Done.
-    Ini menjadi cadangan jika posisi kolom Jadwal berubah.
-    """
 
     for cell in col_data:
 
@@ -536,11 +575,6 @@ def find_date_done_in_row(col_data):
 
 def find_job_text_in_row(col_data):
 
-    """
-    Mencari kolom yang benar-benar berisi Ganti Motor.
-    Berguna jika indeks kolom pekerjaan berubah.
-    """
-
     for cell in col_data:
 
         lower = cell.lower()
@@ -569,11 +603,6 @@ def find_machine_text_in_row(col_data):
 
 
 def find_sub_machine_text_in_row(col_data):
-
-    """
-    Tidak menebak kolom Sub Mesin dari posisi.
-    Hanya digunakan jika header memang memberikan indeks.
-    """
 
     return ""
 
@@ -709,7 +738,6 @@ def run_job_scraper(date_from, date_to):
             driver.current_url
         )
 
-        # Pastikan tidak kembali ke halaman login
         if "login" in driver.current_url.lower():
 
             page_text = driver.find_element(
@@ -804,7 +832,6 @@ def run_job_scraper(date_from, date_to):
 
             time.sleep(1)
 
-            # Hindari memproses halaman yang sama berulang kali
             current_url = driver.current_url
 
             if current_url in visited_pages:
@@ -858,8 +885,6 @@ def run_job_scraper(date_from, date_to):
                         for col in cols
                     ]
 
-                    # Abaikan baris kosong, bukan berdasarkan
-                    # jumlah kolom minimal 10.
                     if not col_data or not any(col_data):
                         continue
 
@@ -878,13 +903,11 @@ def run_job_scraper(date_from, date_to):
                         or "dial motor" in raw_job.lower()
                     ):
 
-                        # Cadangan: cari di semua kolom
                         raw_job = find_job_text_in_row(
                             col_data
                         )
 
                     if not raw_job:
-
                         continue
 
                     # ----------------------------------------
@@ -916,7 +939,6 @@ def run_job_scraper(date_from, date_to):
                             raw_tgl_str
                         )
 
-                    # Jika posisi jadwal salah, cari di seluruh sel
                     if not dt_obj:
 
                         (
@@ -943,7 +965,6 @@ def run_job_scraper(date_from, date_to):
                     if not (
                         date_from <= dt_obj.date() <= date_to
                     ):
-
                         continue
 
                     # ----------------------------------------
@@ -980,12 +1001,24 @@ def run_job_scraper(date_from, date_to):
 
                     # ----------------------------------------
                     # AMBIL PERSONIL
+                    # KHUSUS KOLOM PERSONIL, BUKAN PIC
                     # ----------------------------------------
+
+                    personil_index = column_indices.get(
+                        "personil"
+                    )
 
                     personil = get_cell_value(
                         col_data,
-                        column_indices.get("personil")
+                        personil_index
                     )
+
+                    if not personil:
+
+                        print(
+                            f"   Baris {row_number}: "
+                            "kolom Personil kosong/tidak ditemukan."
+                        )
 
                     # ----------------------------------------
                     # NAMA MOTOR
@@ -996,7 +1029,6 @@ def run_job_scraper(date_from, date_to):
                     )
 
                     if not nama_motor:
-
                         continue
 
                     # ----------------------------------------
@@ -1032,7 +1064,7 @@ def run_job_scraper(date_from, date_to):
                     print(
                         f"   [BERKALA] {nama_motor} | "
                         f"{nama_mesin} | {sub_mesin} | "
-                        f"{tgl_terakhir} | {personil}"
+                        f"{tgl_terakhir} | Personil: {personil}"
                     )
 
                 except Exception as row_error:
@@ -1099,7 +1131,10 @@ def run_job_scraper(date_from, date_to):
 
                 break
 
-            # Periksa apakah tombol dinonaktifkan
+            # ------------------------------------------------
+            # PERIKSA TOMBOL DISABLED
+            # ------------------------------------------------
+
             try:
 
                 parent = next_button.find_element(
@@ -1129,7 +1164,10 @@ def run_job_scraper(date_from, date_to):
             except Exception:
                 pass
 
-            # Klik halaman berikutnya
+            # ------------------------------------------------
+            # PINDAH HALAMAN
+            # ------------------------------------------------
+
             try:
 
                 old_url = driver.current_url
@@ -1141,7 +1179,6 @@ def run_job_scraper(date_from, date_to):
 
                 time.sleep(3)
 
-                # Tunggu perubahan halaman jika URL berubah
                 if driver.current_url != old_url:
 
                     print(
@@ -1156,7 +1193,6 @@ def run_job_scraper(date_from, date_to):
 
                 page_num += 1
 
-                # Header mungkin berubah/ter-render ulang
                 column_indices = get_job_table_column_indices(
                     driver
                 )
@@ -1363,10 +1399,10 @@ def run_appsheet_scraper(date_from, date_to):
             item.get("Sub Mesin", "")
         )
 
+        # HANYA MENGAMBIL KOLOM PERSONIL
+        # Tidak menggunakan PIC atau Nama sebagai alternatif.
         personil = str(
-            item.get("PIC", "")
-            or item.get("Nama", "")
-            or ""
+            item.get("Personil", "") or ""
         ).strip()
 
         tgl_terakhir = tanggal_obj.strftime(
@@ -1399,7 +1435,8 @@ def run_appsheet_scraper(date_from, date_to):
 
         print(
             f"   [PERBAIKAN] {nama_motor} | "
-            f"{nama_mesin} | {sub_mesin} | {tgl_terakhir}"
+            f"{nama_mesin} | {sub_mesin} | "
+            f"{tgl_terakhir} | Personil: {personil}"
         )
 
     print(
