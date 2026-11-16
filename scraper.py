@@ -247,19 +247,6 @@ def clean_motor_name(raw_text):
 
 def extract_motor_from_detail(detail_pekerjaan):
 
-    """
-    Mengambil nama motor setelah kata 'Ganti Motor'.
-
-    Contoh:
-    Ganti Motor Motor Pusher
-    Hasil: Motor Pusher
-
-    Ganti Motor: Conveyor Plate 2
-    Hasil: Conveyor Plate 2
-
-    Tidak mengambil data dari kolom Part atau Unit Part.
-    """
-
     if not detail_pekerjaan:
         return ""
 
@@ -276,7 +263,6 @@ def extract_motor_from_detail(detail_pekerjaan):
 
     nama_motor = match.group(1).strip()
 
-    # Menghentikan pengambilan jika menemukan pemisah
     nama_motor = re.split(
         r'[,&;\n]|\bTrial\b',
         nama_motor,
@@ -284,7 +270,6 @@ def extract_motor_from_detail(detail_pekerjaan):
         flags=re.IGNORECASE
     )[0].strip()
 
-    # Bersihkan karakter pemisah di awal/akhir
     nama_motor = nama_motor.strip(" :-_.")
 
     return nama_motor
@@ -295,14 +280,6 @@ def extract_motor_from_detail(detail_pekerjaan):
 # ============================================================
 
 def normalize_machine_name(raw_machine):
-
-    """
-    Mengubah nama mesin menjadi kode FS saja.
-
-    FS05 - DESTACKING MACHINE -> FS 5
-    FS01 - FORMING MACHINE    -> FS 1
-    FS08 - STACKING MACHINE   -> FS 8
-    """
 
     if not raw_machine:
         return ""
@@ -325,7 +302,104 @@ def normalize_machine_name(raw_machine):
 
 
 # ============================================================
-# 7. SCRAPER PERTAMA: JOB.PMP.WEB.ID
+# 7. NORMALISASI SUB MESIN
+# ============================================================
+
+def normalize_sub_machine(raw_sub_machine):
+
+    if not raw_sub_machine:
+        return ""
+
+    return re.sub(
+        r'\s+',
+        ' ',
+        str(raw_sub_machine).strip()
+    ).upper()
+
+
+# ============================================================
+# 8. MEMBACA POSISI KOLOM TABEL JOB.PMP
+# ============================================================
+
+def normalize_header(text):
+
+    return re.sub(
+        r'[^a-z0-9]',
+        '',
+        str(text or '').lower()
+    )
+
+
+def get_job_table_column_indices(driver):
+
+    """
+    Mengambil posisi kolom berdasarkan nama header tabel.
+
+    Kolom Sub Mesin dicari dari header 'Sub Mesin'.
+    Jika header tidak ditemukan, Sub Mesin dikosongkan
+    daripada mengambil kolom yang salah.
+    """
+
+    indices = {
+        "job": 1,
+        "personil": 3,
+        "mesin": 5,
+        "jadwal": 9,
+        "sub_mesin": None
+    }
+
+    try:
+
+        headers = driver.find_elements(
+            By.XPATH,
+            "//table//thead//th"
+        )
+
+        if not headers:
+            headers = driver.find_elements(
+                By.XPATH,
+                "//table//tr[1]/*"
+            )
+
+        header_map = {}
+
+        for index, header in enumerate(headers):
+
+            key = normalize_header(header.text)
+
+            if key:
+                header_map[key] = index
+
+        aliases = {
+            "job": ["pekerjaan", "detailpekerjaan", "namapekerjaan"],
+            "personil": ["pic", "personil", "nama"],
+            "mesin": ["mesin"],
+            "sub_mesin": ["submesin"],
+            "jadwal": ["jadwal", "tanggal", "tanggalpekerjaan"]
+        }
+
+        for field, names in aliases.items():
+
+            for name in names:
+
+                if name in header_map:
+                    indices[field] = header_map[name]
+                    break
+
+        print("   Posisi kolom tabel:", indices)
+
+    except Exception as e:
+
+        print(
+            "   Peringatan: header tabel tidak dapat dibaca:",
+            str(e)
+        )
+
+    return indices
+
+
+# ============================================================
+# 9. SCRAPER PERTAMA: JOB.PMP.WEB.ID
 # ============================================================
 
 def run_job_scraper(date_from, date_to):
@@ -394,6 +468,8 @@ def run_job_scraper(date_from, date_to):
 
         time.sleep(5)
 
+        column_indices = get_job_table_column_indices(driver)
+
         page_num = 1
         max_pages = 32
 
@@ -433,15 +509,30 @@ def run_job_scraper(date_from, date_to):
                 if len(col_data) <= 9:
                     continue
 
-                raw_job = col_data[1]
+                def get_col(field, fallback=None):
 
-                # NORMALISASI NAMA MESIN
+                    idx = column_indices.get(field)
+
+                    if idx is None:
+                        idx = fallback
+
+                    if idx is None or idx >= len(col_data):
+                        return ""
+
+                    return col_data[idx]
+
+                raw_job = get_col("job", 1)
+
                 nama_mesin = normalize_machine_name(
-                    col_data[5]
+                    get_col("mesin", 5)
                 )
 
-                personil = col_data[3]
-                jadwal_teks = col_data[9]
+                sub_mesin = normalize_sub_machine(
+                    get_col("sub_mesin")
+                )
+
+                personil = get_col("personil", 3)
+                jadwal_teks = get_col("jadwal", 9)
 
                 if (
                     "ganti motor" not in raw_job.lower()
@@ -483,6 +574,7 @@ def run_job_scraper(date_from, date_to):
                 row_final = [
                     nama_motor,
                     nama_mesin,
+                    sub_mesin,
                     tgl_terakhir,
                     personil,
                     keterangan,
@@ -492,7 +584,6 @@ def run_job_scraper(date_from, date_to):
 
                 processed_data.append(row_final)
 
-            # Navigasi halaman berikutnya
             try:
 
                 next_button = driver.find_element(
@@ -546,7 +637,7 @@ def run_job_scraper(date_from, date_to):
 
 
 # ============================================================
-# 8. SCRAPER KEDUA: APPSHEET
+# 10. SCRAPER KEDUA: APPSHEET
 # ============================================================
 
 def run_appsheet_scraper(date_from, date_to):
@@ -624,23 +715,12 @@ def run_appsheet_scraper(date_from, date_to):
         if not isinstance(item, dict):
             continue
 
-        # ----------------------------------------------------
-        # A. AMBIL DETAIL PEKERJAAN
-        # ----------------------------------------------------
-
         detail_pekerjaan = str(
             item.get("Detil Pekerjaan", "") or ""
         ).strip()
 
-        # HANYA PERIKSA KOLOM DETAIL PEKERJAAN
-        # Tidak menggunakan Part atau Unit Part.
-
         if SEARCH_KEYWORD.lower() not in detail_pekerjaan.lower():
             continue
-
-        # ----------------------------------------------------
-        # B. FILTER TANGGAL
-        # ----------------------------------------------------
 
         raw_date = item.get("Tanggal", "")
 
@@ -654,10 +734,6 @@ def run_appsheet_scraper(date_from, date_to):
         ):
             continue
 
-        # ----------------------------------------------------
-        # C. EKSTRAK NAMA MOTOR
-        # ----------------------------------------------------
-
         nama_motor = extract_motor_from_detail(
             detail_pekerjaan
         )
@@ -669,19 +745,16 @@ def run_appsheet_scraper(date_from, date_to):
             )
             continue
 
-        # ----------------------------------------------------
-        # D. NAMA MESIN
-        # ----------------------------------------------------
-
         mesin = str(
             item.get("Mesin", "") or ""
         ).strip()
 
         nama_mesin = normalize_machine_name(mesin)
 
-        # ----------------------------------------------------
-        # E. PERSONIL
-        # ----------------------------------------------------
+        # Nama kolom AppSheet persis: Sub Mesin
+        sub_mesin = normalize_sub_machine(
+            item.get("Sub Mesin", "")
+        )
 
         personil = str(
             item.get("PIC", "")
@@ -689,16 +762,11 @@ def run_appsheet_scraper(date_from, date_to):
             or ""
         ).strip()
 
-        # ----------------------------------------------------
-        # F. LABEL DAN PERIODE
-        # ----------------------------------------------------
-
         tgl_terakhir = tanggal_obj.strftime(
             "%d-%m-%y"
         )
 
         keterangan = "Perbaikan"
-
         periode = "120"
 
         next_date = tanggal_obj + timedelta(days=120)
@@ -707,13 +775,10 @@ def run_appsheet_scraper(date_from, date_to):
             "%d-%m-%y"
         )
 
-        # ----------------------------------------------------
-        # G. FORMAT DATA FINAL
-        # ----------------------------------------------------
-
         row_final = [
             nama_motor,
             nama_mesin,
+            sub_mesin,
             tgl_terakhir,
             personil,
             keterangan,
@@ -725,7 +790,7 @@ def run_appsheet_scraper(date_from, date_to):
 
         print(
             f"   [PERBAIKAN] {nama_motor} | "
-            f"{nama_mesin} | {tgl_terakhir}"
+            f"{nama_mesin} | {sub_mesin} | {tgl_terakhir}"
         )
 
     print(
@@ -737,7 +802,7 @@ def run_appsheet_scraper(date_from, date_to):
 
 
 # ============================================================
-# 9. GABUNGKAN DAN KIRIM KE GOOGLE SHEETS
+# 11. GABUNGKAN DAN KIRIM KE GOOGLE SHEETS
 # ============================================================
 
 def send_to_google_sheets(all_data):
@@ -760,12 +825,12 @@ def send_to_google_sheets(all_data):
 
     count_berkala = sum(
         1 for row in all_data
-        if row[4] == "Berkala"
+        if row[5] == "Berkala"
     )
 
     count_perbaikan = sum(
         1 for row in all_data
-        if row[4] == "Perbaikan"
+        if row[5] == "Perbaikan"
     )
 
     print(
@@ -795,7 +860,7 @@ def send_to_google_sheets(all_data):
 
 
 # ============================================================
-# 10. PROGRAM UTAMA
+# 12. PROGRAM UTAMA
 # ============================================================
 
 def run_scraper():
@@ -805,25 +870,17 @@ def run_scraper():
     print("SISTEM SCRAPER GABUNGAN MOTOR PMP")
     print("=" * 60)
 
-    # A. Rentang tanggal yang sama untuk dua scraper
-
     date_from, date_to = get_date_range()
-
-    # B. Scraper berkala
 
     berkala_data = run_job_scraper(
         date_from,
         date_to
     )
 
-    # C. Scraper perbaikan
-
     perbaikan_data = run_appsheet_scraper(
         date_from,
         date_to
     )
-
-    # D. Gabungkan data
 
     combined_data = (
         berkala_data + perbaikan_data
@@ -845,8 +902,6 @@ def run_scraper():
     print(
         f"TOTAL     : {len(combined_data)}"
     )
-
-    # E. Kirim satu kali ke database
 
     send_to_google_sheets(
         combined_data
