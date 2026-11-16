@@ -2,1542 +2,1952 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Pengecekan Berkala Motor - PMP</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitoring Penggantian Motor</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        pmpDark: '#1e293b',
-                        pmpHeader: '#334155',
-                        pmpAccent: '#0284c7',
-                        pmpHover: '#0369a1'
-                    }
-                }
-            }
-        }
-    </script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+    }
+
+    .modal-backdrop {
+      background: rgba(15, 23, 42, 0.55);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      min-width: 1100px;
+    }
+
+    th, td {
+      white-space: nowrap;
+    }
+
+    .progress-transition {
+      transition: width 0.5s ease;
+    }
+
+    .modal-hidden {
+      display: none;
+    }
+  </style>
 </head>
 
-<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
+<body class="min-h-screen">
 
-    <!-- TOP NAVIGATION BAR -->
-    <header class="bg-pmpDark text-white shadow-md">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+  <!-- ======================================================
+       HEADER
+  ======================================================= -->
 
-            <div class="flex items-center space-x-3">
-                <div class="bg-pmpAccent p-2 rounded-lg text-white">
-                    <i class="fa-solid fa-gears text-xl"></i>
-                </div>
+  <header class="bg-slate-900 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-5">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
 
-                <div>
-                    <h1 class="text-lg font-bold tracking-wide">
-                        Data Pengecekan Berkala Motor
-                    </h1>
+        <div>
+          <h1 class="text-xl md:text-2xl font-bold">
+            <i class="fa-solid fa-gears mr-2"></i>
+            Monitoring Penggantian Motor
+          </h1>
 
-                    <p class="text-xs text-slate-300">
-                        Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya
-                    </p>
-                </div>
-            </div>
-
-            <div>
-                <a href="history.html"
-                   class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
-
-                    <i class="fa-solid fa-clock-rotate-left"></i>
-                    Lihat History Motor
-
-                </a>
-            </div>
-
-        </div>
-    </header>
-
-
-    <!-- MAIN CONTAINER -->
-    <main class="max-w-7xl mx-auto px-4 py-6">
-
-        <!-- FILTER & ACTION BAR -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-
-            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-
-                <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-sm">
-                    <span class="text-slate-500 mr-2">Dari</span>
-                    <input type="date"
-                           id="dateFrom"
-                           class="bg-transparent focus:outline-none text-slate-700 font-medium">
-                </div>
-
-                <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-sm">
-                    <span class="text-slate-500 mr-2">S/d</span>
-                    <input type="date"
-                           id="dateTo"
-                           class="bg-transparent focus:outline-none text-slate-700 font-medium">
-                </div>
-
-                <button onclick="triggerScraperModal()"
-                        class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm">
-
-                    <i class="fa-solid fa-bolt mr-2"></i>
-                    Tarik Data
-
-                </button>
-
-                <button onclick="triggerSaveDatabaseModal()"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm">
-
-                    <i class="fa-solid fa-floppy-disk mr-2"></i>
-                    Simpan ke Database
-
-                </button>
-
-            </div>
-
-
-            <div class="flex items-center gap-3 w-full md:w-auto justify-end">
-
-                <div class="relative w-full md:w-64">
-
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                        <i class="fa-solid fa-search text-xs"></i>
-                    </span>
-
-                    <input type="text"
-                           id="searchInput"
-                           onkeyup="filterTable()"
-                           placeholder="Cari motor, mesin, atau sub mesin..."
-                           class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
-
-                </div>
-
-                <button onclick="openAddModal()"
-                        class="bg-pmpAccent hover:bg-pmpHover text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm whitespace-nowrap">
-
-                    <i class="fa-solid fa-plus mr-2"></i>
-                    Tambah Data Baru
-
-                </button>
-
-            </div>
-
+          <p class="text-slate-300 text-sm mt-1">
+            Data penggantian motor berkala dan perbaikan
+          </p>
         </div>
 
+        <div class="flex gap-2 flex-wrap">
+          <button onclick="loadData()"
+                  class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm">
+            <i class="fa-solid fa-rotate mr-1"></i>
+            Refresh
+          </button>
 
-        <!-- TABEL DATA -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+          <button onclick="saveToDatabase()"
+                  class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm">
+            <i class="fa-solid fa-database mr-1"></i>
+            Simpan Riwayat
+          </button>
 
-            <div class="overflow-x-auto">
-
-                <table class="w-full text-left border-collapse" id="dataTable">
-
-                    <thead>
-                        <tr class="bg-slate-800 text-white text-xs uppercase tracking-wider">
-
-                            <th class="py-3 px-4 text-center w-12">No</th>
-
-                            <th class="py-3 px-4">Nama Motor</th>
-
-                            <th class="py-3 px-4">Nama Mesin</th>
-
-                            <th class="py-3 px-4">Sub Mesin</th>
-
-                            <th class="py-3 px-4">
-                                Tanggal Penggantian Berkala Terakhir
-                            </th>
-
-                            <th class="py-3 px-4">Personil</th>
-
-                            <th class="py-3 px-4">Keterangan</th>
-
-                            <th class="py-3 px-4 text-center">Periode</th>
-
-                            <th class="py-3 px-4 cursor-pointer hover:bg-slate-700 transition select-none"
-                                onclick="toggleSortDate()">
-
-                                Tanggal Berkala Selanjutnya
-
-                                <i id="sortIcon"
-                                   class="fa-solid fa-sort ml-1 text-slate-400"></i>
-
-                            </th>
-
-                            <th class="py-3 px-4 text-center">Aksi</th>
-
-                        </tr>
-                    </thead>
-
-                    <tbody id="tableBody"
-                           class="divide-y divide-slate-200 text-sm">
-
-                        <tr>
-                            <td colspan="10"
-                                class="text-center py-6 text-slate-400">
-
-                                <i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i>
-                                <br>
-                                Memuat data...
-
-                            </td>
-                        </tr>
-
-                    </tbody>
-
-                </table>
-
-            </div>
-
+          <button onclick="openScraperModal()"
+                  class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm">
+            <i class="fa-solid fa-cloud-arrow-down mr-1"></i>
+            Jalankan Scraper
+          </button>
         </div>
 
-    </main>
+      </div>
+    </div>
+  </header>
 
 
-    <!-- MODAL -->
-    <div id="customModal"
-         class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
+  <!-- ======================================================
+       MAIN CONTENT
+  ======================================================= -->
 
-        <div id="modalContainer"
-             class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300">
+  <main class="max-w-7xl mx-auto px-4 py-6">
 
-            <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
+    <!-- STATISTIK -->
 
-                <h3 id="modalTitle"
-                    class="font-bold text-base flex items-center gap-2">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
 
-                    <i class="fa-solid fa-circle-info text-pmpAccent"></i>
-                    Konfirmasi Aksi
+      <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+        <div class="text-sm text-slate-500">Total Data</div>
+        <div id="totalData" class="text-3xl font-bold text-slate-800 mt-1">0</div>
+      </div>
 
-                </h3>
+      <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+        <div class="text-sm text-slate-500">Data Berkala</div>
+        <div id="totalBerkala" class="text-3xl font-bold text-blue-600 mt-1">0</div>
+      </div>
 
-                <button onclick="closeModal()"
-                        class="text-slate-400 hover:text-white transition">
-
-                    <i class="fa-solid fa-xmark text-lg"></i>
-
-                </button>
-
-            </div>
-
-            <div id="modalBody"
-                 class="p-6 text-slate-600 max-h-[75vh] overflow-y-auto">
-            </div>
-
-            <div id="modalFooter"
-                 class="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100">
-
-                <button onclick="closeModal()"
-                        class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">
-
-                    Batal
-
-                </button>
-
-                <button id="modalConfirmBtn"
-                        class="px-4 py-2 bg-pmpAccent hover:bg-pmpHover text-white font-medium rounded-lg text-sm transition shadow-sm">
-
-                    Ya, Lanjutkan
-
-                </button>
-
-            </div>
-
-        </div>
+      <div class="bg-white rounded-xl shadow-sm p-5 border border-slate-200">
+        <div class="text-sm text-slate-500">Data Perbaikan</div>
+        <div id="totalPerbaikan" class="text-3xl font-bold text-amber-600 mt-1">0</div>
+      </div>
 
     </div>
 
 
-    <!-- SCRIPT -->
-    <script>
+    <!-- ====================================================
+         FILTER DAN ACTION
+    ===================================================== -->
 
-        const APPS_SCRIPT_URL =
-            "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-5">
 
-        let globalData = [];
-        let sortAscending = true;
+      <div class="flex flex-col lg:flex-row gap-3 lg:items-end lg:justify-between">
+
+        <div class="flex-1">
+          <label class="block text-sm font-semibold text-slate-600 mb-1">
+            Cari Data
+          </label>
+
+          <div class="relative">
+            <i class="fa-solid fa-search absolute left-3 top-3 text-slate-400"></i>
+
+            <input id="searchInput"
+                   type="text"
+                   placeholder="Cari nama motor, mesin, personil..."
+                   oninput="filterTable()"
+                   class="w-full border border-slate-300 rounded-lg pl-10 pr-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
 
 
-        // ====================================================
-        // 1. UTILITAS
-        // ====================================================
+        <div class="w-full lg:w-48">
+          <label class="block text-sm font-semibold text-slate-600 mb-1">
+            Keterangan
+          </label>
 
-        function upper(value) {
-            return String(value ?? "").toUpperCase();
+          <select id="filterKeterangan"
+                  onchange="filterTable()"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+
+            <option value="">Semua Data</option>
+            <option value="BERKALA">Berkala</option>
+            <option value="PERBAIKAN">Perbaikan</option>
+
+          </select>
+        </div>
+
+
+        <div class="flex gap-2">
+
+          <button onclick="openAddModal()"
+                  class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+            <i class="fa-solid fa-plus mr-1"></i>
+            Tambah Data
+          </button>
+
+          <button onclick="resetFilter()"
+                  class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm">
+            <i class="fa-solid fa-filter-circle-xmark mr-1"></i>
+            Reset
+          </button>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ====================================================
+         TABEL DATA
+    ===================================================== -->
+
+    <section class="bg-white rounded-xl shadow-sm border border-slate-200">
+
+      <div class="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+
+        <div>
+          <h2 class="font-bold text-slate-800">
+            <i class="fa-solid fa-table-list mr-2"></i>
+            Daftar Penggantian Motor
+          </h2>
+
+          <p class="text-xs text-slate-500 mt-1">
+            Data diperbarui dari Google Sheets
+          </p>
+        </div>
+
+        <div id="loadingText" class="text-sm text-blue-600 hidden">
+          <i class="fa-solid fa-spinner fa-spin mr-1"></i>
+          Memuat data...
+        </div>
+
+      </div>
+
+
+      <div class="table-wrap">
+
+        <table class="w-full text-sm text-left">
+
+          <thead class="bg-slate-800 text-white">
+
+            <tr>
+              <th class="px-3 py-3">No</th>
+              <th class="px-3 py-3">Nama Motor</th>
+              <th class="px-3 py-3">Nama Mesin</th>
+              <th class="px-3 py-3">Sub Mesin</th>
+
+              <th class="px-3 py-3 cursor-pointer"
+                  onclick="toggleSortDate()">
+                Tanggal Penggantian Berkala Terakhir
+                <i id="sortIcon" class="fa-solid fa-sort ml-1"></i>
+              </th>
+
+              <th class="px-3 py-3">Personil</th>
+              <th class="px-3 py-3">Keterangan</th>
+              <th class="px-3 py-3">Periode</th>
+              <th class="px-3 py-3">Tanggal Berkala Selanjutnya</th>
+              <th class="px-3 py-3 text-center">Aksi</th>
+            </tr>
+
+          </thead>
+
+          <tbody id="tableBody" class="divide-y divide-slate-100">
+
+            <tr>
+              <td colspan="10" class="text-center py-10 text-slate-400">
+                Memuat data...
+              </td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+
+      <div class="p-4 border-t border-slate-200 flex justify-between text-sm text-slate-500">
+        <span id="showingInfo">Menampilkan 0 data</span>
+        <span id="lastUpdated"></span>
+      </div>
+
+    </section>
+
+  </main>
+
+
+  <!-- ======================================================
+       MODAL TAMBAH / EDIT DATA
+  ======================================================= -->
+
+  <div id="dataModal"
+       class="fixed inset-0 z-50 modal-backdrop modal-hidden items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
+
+      <div class="bg-slate-900 text-white p-4 flex justify-between items-center">
+
+        <h3 id="modalTitle" class="font-bold text-lg">
+          Tambah Data
+        </h3>
+
+        <button onclick="closeDataModal()"
+                class="text-white hover:text-red-300 text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+      </div>
+
+
+      <form id="dataForm" onsubmit="submitDataForm(event)" class="p-5">
+
+        <input type="hidden" id="editIndex">
+
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div class="md:col-span-2">
+
+            <label class="block text-sm font-semibold mb-1">
+              Nama Motor
+            </label>
+
+            <input id="namaMotor"
+                   required
+                   type="text"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 uppercase"
+                   placeholder="NAMA MOTOR">
+
+          </div>
+
+
+          <div>
+
+            <label class="block text-sm font-semibold mb-1">
+              Nama Mesin
+            </label>
+
+            <input id="namaMesin"
+                   required
+                   type="text"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 uppercase"
+                   placeholder="FS 1">
+
+          </div>
+
+
+          <div>
+
+            <label class="block text-sm font-semibold mb-1">
+              Sub Mesin
+            </label>
+
+            <input id="subMesin"
+                   type="text"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 uppercase"
+                   placeholder="SUB MESIN">
+
+          </div>
+
+
+          <div>
+
+            <label class="block text-sm font-semibold mb-1">
+              Tanggal Penggantian Terakhir
+            </label>
+
+            <input id="tglTerakhir"
+                   required
+                   type="date"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2">
+
+          </div>
+
+
+          <div>
+
+            <label class="block text-sm font-semibold mb-1">
+              Personil
+            </label>
+
+            <input id="personil"
+                   type="text"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 uppercase"
+                   placeholder="NAMA PERSONIL">
+
+          </div>
+
+
+          <div>
+
+            <label class="block text-sm font-semibold mb-1">
+              Keterangan
+            </label>
+
+            <select id="keterangan"
+                    class="w-full border border-slate-300 rounded-lg px-3 py-2">
+
+              <option value="BERKALA">BERKALA</option>
+              <option value="PERBAIKAN">PERBAIKAN</option>
+
+            </select>
+
+          </div>
+
+
+          <div>
+
+            <label class="block text-sm font-semibold mb-1">
+              Periode (Hari)
+            </label>
+
+            <input id="periode"
+                   type="number"
+                   min="1"
+                   value="120"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2">
+
+          </div>
+
+
+          <div class="md:col-span-2">
+
+            <label class="block text-sm font-semibold mb-1">
+              Tanggal Berkala Selanjutnya
+            </label>
+
+            <input id="tglSelanjutnya"
+                   type="date"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2">
+
+          </div>
+
+        </div>
+
+
+        <div class="flex justify-end gap-2 mt-6">
+
+          <button type="button"
+                  onclick="closeDataModal()"
+                  class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300">
+            Batal
+          </button>
+
+          <button id="saveDataButton"
+                  type="submit"
+                  class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
+            <i class="fa-solid fa-floppy-disk mr-1"></i>
+            Simpan
+          </button>
+
+        </div>
+
+      </form>
+
+    </div>
+
+  </div>
+
+
+  <!-- ======================================================
+       MODAL SCRAPER
+  ======================================================= -->
+
+  <div id="scraperModal"
+       class="fixed inset-0 z-50 modal-backdrop modal-hidden items-center justify-center p-4">
+
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+
+      <div class="bg-slate-900 text-white p-4 flex justify-between items-center">
+
+        <h3 class="font-bold text-lg">
+          <i class="fa-solid fa-cloud-arrow-down mr-2"></i>
+          Jalankan Scraper
+        </h3>
+
+        <button onclick="closeScraperModal()"
+                class="text-white hover:text-red-300 text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+      </div>
+
+
+      <div class="p-5">
+
+        <div id="scraperDateForm">
+
+          <p class="text-sm text-slate-600 mb-4">
+            Pilih rentang tanggal pekerjaan yang ingin diambil dari Job PMP dan AppSheet.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            <div>
+
+              <label class="block text-sm font-semibold mb-1">
+                Tanggal Dari
+              </label>
+
+              <input id="scraperDateFrom"
+                     type="date"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2">
+
+            </div>
+
+
+            <div>
+
+              <label class="block text-sm font-semibold mb-1">
+                Tanggal Sampai
+              </label>
+
+              <input id="scraperDateTo"
+                     type="date"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2">
+
+            </div>
+
+          </div>
+
+
+          <div class="flex justify-end gap-2 mt-6">
+
+            <button onclick="closeScraperModal()"
+                    class="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300">
+              Batal
+            </button>
+
+            <button onclick="triggerScraper()"
+                    id="triggerScraperButton"
+                    class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white">
+
+              <i class="fa-solid fa-play mr-1"></i>
+              Mulai Scraper
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <!-- PROGRESS SCRAPER -->
+
+        <div id="scraperProgressArea" class="hidden">
+
+          <div class="flex items-center justify-between mb-2">
+
+            <span class="text-sm font-semibold text-slate-700">
+              Progres Scraper
+            </span>
+
+            <span id="progressPercent"
+                  class="text-xl font-bold text-blue-600">
+              0%
+            </span>
+
+          </div>
+
+
+          <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
+
+            <div id="progressBar"
+                 class="progress-transition bg-blue-600 h-4 rounded-full"
+                 style="width: 0%">
+            </div>
+
+          </div>
+
+
+          <div class="mt-4">
+
+            <div class="flex items-center gap-2">
+
+              <span id="progressStatusIcon"
+                    class="text-blue-600">
+                <i class="fa-solid fa-spinner fa-spin"></i>
+              </span>
+
+              <span id="progressStage"
+                    class="font-bold text-slate-800">
+                Menunggu scraper
+              </span>
+
+            </div>
+
+            <p id="progressDetail"
+               class="text-sm text-slate-500 mt-2">
+              Menunggu proses dimulai...
+            </p>
+
+            <p id="progressUpdated"
+               class="text-xs text-slate-400 mt-2">
+            </p>
+
+          </div>
+
+
+          <div id="progressResult"
+               class="hidden mt-4 p-3 rounded-lg text-sm">
+          </div>
+
+
+          <div class="flex justify-end mt-5">
+
+            <button id="closeProgressButton"
+                    onclick="closeScraperModal()"
+                    class="hidden px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white">
+              Tutup
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- ======================================================
+       NOTIFICATION
+  ======================================================= -->
+
+  <div id="notification"
+       class="fixed bottom-5 right-5 z-[100] hidden max-w-sm">
+
+    <div id="notificationContent"
+         class="rounded-lg shadow-lg px-5 py-4 text-white">
+
+      <span id="notificationMessage"></span>
+
+    </div>
+
+  </div>
+
+
+  <!-- ======================================================
+       JAVASCRIPT
+  ======================================================= -->
+
+  <script>
+
+    // ======================================================
+    // 1. KONFIGURASI
+    // ======================================================
+
+    const APPS_SCRIPT_URL =
+      "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+
+
+    // ======================================================
+    // 2. VARIABEL GLOBAL
+    // ======================================================
+
+    let globalData = [];
+    let sortAscending = false;
+    let scraperPolling = null;
+
+
+    // ======================================================
+    // 3. PEMBANTU FORMAT
+    // ======================================================
+
+    function escapeHtml(value) {
+
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    }
+
+
+    function formatDateForInput(value) {
+
+      if (!value) return "";
+
+      const text = String(value).trim();
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        return text;
+      }
+
+      const parts = text.split("-");
+
+      if (parts.length === 3) {
+
+        if (parts[0].length === 4) {
+          return text;
+        }
+
+        return parts[2] + "-" + parts[1] + "-" + parts[0];
+
+      }
+
+      return "";
+
+    }
+
+
+    function formatDateForSheet(value) {
+
+      if (!value) return "";
+
+      const parts = String(value).split("-");
+
+      if (parts.length !== 3) return value;
+
+      // Input date: YYYY-MM-DD
+      // Google Sheet: DD-MM-YYYY
+
+      return parts[2] + "-" + parts[1] + "-" + parts[0];
+
+    }
+
+
+    function parseDateValue(value) {
+
+      if (!value) return 0;
+
+      const text = String(value).trim();
+
+      let parts = text.split("-");
+
+      if (parts.length !== 3) return 0;
+
+      let day, month, year;
+
+      if (parts[0].length === 4) {
+
+        year = Number(parts[0]);
+        month = Number(parts[1]) - 1;
+        day = Number(parts[2]);
+
+      } else {
+
+        day = Number(parts[0]);
+        month = Number(parts[1]) - 1;
+        year = Number(parts[2]);
+
+      }
+
+      const result = new Date(
+        year,
+        month,
+        day
+      ).getTime();
+
+      return isNaN(result) ? 0 : result;
+
+    }
+
+
+    // ======================================================
+    // 4. NOTIFICATION
+    // ======================================================
+
+    function showNotification(message, type = "success") {
+
+      const notification =
+        document.getElementById("notification");
+
+      const content =
+        document.getElementById("notificationContent");
+
+      document.getElementById(
+        "notificationMessage"
+      ).textContent = message;
+
+      content.className =
+        "rounded-lg shadow-lg px-5 py-4 text-white ";
+
+      if (type === "error") {
+
+        content.className += "bg-red-600";
+
+      } else if (type === "warning") {
+
+        content.className += "bg-amber-500";
+
+      } else {
+
+        content.className += "bg-emerald-600";
+
+      }
+
+      notification.classList.remove("hidden");
+
+      setTimeout(function() {
+
+        notification.classList.add("hidden");
+
+      }, 4000);
+
+    }
+
+
+    // ======================================================
+    // 5. LOAD DATA
+    // ======================================================
+
+    async function loadData() {
+
+      const loadingText =
+        document.getElementById("loadingText");
+
+      loadingText.classList.remove("hidden");
+
+      try {
+
+        const response = await fetch(
+          APPS_SCRIPT_URL + "?t=" + Date.now()
+        );
+
+        if (!response.ok) {
+          throw new Error("Gagal mengambil data.");
+        }
+
+        const result = await response.json();
+
+        if (!Array.isArray(result)) {
+          throw new Error("Format data tidak valid.");
+        }
+
+        // Baris pertama adalah header.
+        // Struktur data:
+        // 0 Nama Motor
+        // 1 Nama Mesin
+        // 2 Sub Mesin
+        // 3 Tanggal Terakhir
+        // 4 Personil
+        // 5 Keterangan
+        // 6 Periode
+        // 7 Tanggal Selanjutnya
+
+        globalData = result.slice(1).map(function(row) {
+
+          return [
+            row[0] || "",
+            row[1] || "",
+            row[2] || "",
+            row[3] || "",
+            row[4] || "",
+            row[5] || "",
+            row[6] || "120",
+            row[7] || ""
+          ];
+
+        });
+
+        updateStatistics();
+
+        filterTable();
+
+        document.getElementById(
+          "lastUpdated"
+        ).textContent =
+          "Diperbarui: " +
+          new Date().toLocaleTimeString("id-ID");
+
+      } catch (error) {
+
+        console.error(error);
+
+        showNotification(
+          "Gagal memuat data: " + error.message,
+          "error"
+        );
+
+      } finally {
+
+        loadingText.classList.add("hidden");
+
+      }
+
+    }
+
+
+    // ======================================================
+    // 6. STATISTIK
+    // ======================================================
+
+    function updateStatistics() {
+
+      const total = globalData.length;
+
+      const berkala = globalData.filter(function(row) {
+        return String(row[5]).toUpperCase() === "BERKALA";
+      }).length;
+
+      const perbaikan = globalData.filter(function(row) {
+        return String(row[5]).toUpperCase() === "PERBAIKAN";
+      }).length;
+
+      document.getElementById(
+        "totalData"
+      ).textContent = total;
+
+      document.getElementById(
+        "totalBerkala"
+      ).textContent = berkala;
+
+      document.getElementById(
+        "totalPerbaikan"
+      ).textContent = perbaikan;
+
+    }
+
+
+    // ======================================================
+    // 7. RENDER TABEL
+    // ======================================================
+
+    function renderTable(data) {
+
+      const tbody =
+        document.getElementById("tableBody");
+
+      tbody.innerHTML = "";
+
+      if (!data.length) {
+
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10"
+                class="text-center py-10 text-slate-400">
+              Tidak ada data yang ditemukan.
+            </td>
+          </tr>
+        `;
+
+        document.getElementById(
+          "showingInfo"
+        ).textContent = "Menampilkan 0 data";
+
+        return;
+
+      }
+
+
+      data.forEach(function(item) {
+
+        const row = item.row;
+        const originalIndex = item.index;
+
+        const keterangan =
+          String(row[5] || "").toUpperCase();
+
+        let badgeClass =
+          "bg-slate-100 text-slate-700";
+
+        if (keterangan === "BERKALA") {
+          badgeClass = "bg-blue-100 text-blue-700";
+        }
+
+        if (keterangan === "PERBAIKAN") {
+          badgeClass = "bg-amber-100 text-amber-700";
         }
 
 
-        function escapeHtml(value) {
+        const tr = document.createElement("tr");
 
-            return String(value ?? "")
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+        tr.className =
+          "hover:bg-slate-50 transition";
+
+
+        tr.innerHTML = `
+
+          <td class="px-3 py-3 text-slate-500">
+            ${originalIndex + 1}
+          </td>
+
+          <td class="px-3 py-3 font-semibold text-slate-800">
+            ${escapeHtml(row[0])}
+          </td>
+
+          <td class="px-3 py-3">
+            ${escapeHtml(row[1])}
+          </td>
+
+          <td class="px-3 py-3">
+            ${escapeHtml(row[2])}
+          </td>
+
+          <td class="px-3 py-3">
+            ${escapeHtml(row[3])}
+          </td>
+
+          <td class="px-3 py-3">
+            ${escapeHtml(row[4])}
+          </td>
+
+          <td class="px-3 py-3">
+            <span class="px-2 py-1 rounded-full text-xs font-semibold ${badgeClass}">
+              ${escapeHtml(keterangan)}
+            </span>
+          </td>
+
+          <td class="px-3 py-3">
+            ${escapeHtml(row[6])}
+          </td>
+
+          <td class="px-3 py-3">
+            ${escapeHtml(row[7])}
+          </td>
+
+          <td class="px-3 py-3">
+
+            <div class="flex justify-center gap-2">
+
+              <button
+                onclick="openEditModal(${originalIndex})"
+                title="Edit"
+                class="bg-amber-100 hover:bg-amber-200 text-amber-700 w-8 h-8 rounded-lg">
+
+                <i class="fa-solid fa-pen"></i>
+
+              </button>
+
+
+              <button
+                onclick="deleteData(${originalIndex})"
+                title="Hapus"
+                class="bg-red-100 hover:bg-red-200 text-red-700 w-8 h-8 rounded-lg">
+
+                <i class="fa-solid fa-trash"></i>
+
+              </button>
+
+            </div>
+
+          </td>
+
+        `;
+
+        tbody.appendChild(tr);
+
+      });
+
+
+      document.getElementById(
+        "showingInfo"
+      ).textContent =
+        "Menampilkan " + data.length +
+        " dari " + globalData.length + " data";
+
+    }
+
+
+    // ======================================================
+    // 8. FILTER TABEL
+    // ======================================================
+
+    function filterTable() {
+
+      const keyword =
+        document.getElementById(
+          "searchInput"
+        ).value.toUpperCase().trim();
+
+      const filterKet =
+        document.getElementById(
+          "filterKeterangan"
+        ).value.toUpperCase();
+
+
+      let filtered = globalData.map(function(row, index) {
+
+        return {
+          row: row,
+          index: index
+        };
+
+      });
+
+
+      filtered = filtered.filter(function(item) {
+
+        const row = item.row;
+
+        const text = row.join(" ").toUpperCase();
+
+        const matchKeyword =
+          !keyword || text.includes(keyword);
+
+        const matchKet =
+          !filterKet ||
+          String(row[5]).toUpperCase() === filterKet;
+
+        return matchKeyword && matchKet;
+
+      });
+
+
+      renderTable(filtered);
+
+    }
+
+
+    function resetFilter() {
+
+      document.getElementById(
+        "searchInput"
+      ).value = "";
+
+      document.getElementById(
+        "filterKeterangan"
+      ).value = "";
+
+      filterTable();
+
+    }
+
+
+    // ======================================================
+    // 9. SORTING TANGGAL
+    // ======================================================
+
+    function toggleSortDate() {
+
+      sortAscending = !sortAscending;
+
+      const sorted = globalData.map(function(row, index) {
+
+        return {
+          row: row,
+          index: index
+        };
+
+      });
+
+      sorted.sort(function(a, b) {
+
+        const dateA = parseDateValue(a.row[3]);
+        const dateB = parseDateValue(b.row[3]);
+
+        return sortAscending
+          ? dateA - dateB
+          : dateB - dateA;
+
+      });
+
+
+      document.getElementById(
+        "sortIcon"
+      ).className = sortAscending
+        ? "fa-solid fa-sort-up ml-1"
+        : "fa-solid fa-sort-down ml-1";
+
+
+      // Tetap terapkan pencarian dan filter keterangan.
+      const keyword =
+        document.getElementById(
+          "searchInput"
+        ).value.toUpperCase().trim();
+
+      const filterKet =
+        document.getElementById(
+          "filterKeterangan"
+        ).value.toUpperCase();
+
+
+      const filtered = sorted.filter(function(item) {
+
+        const text = item.row.join(" ").toUpperCase();
+
+        const matchKeyword =
+          !keyword || text.includes(keyword);
+
+        const matchKet =
+          !filterKet ||
+          String(item.row[5]).toUpperCase() === filterKet;
+
+        return matchKeyword && matchKet;
+
+      });
+
+      renderTable(filtered);
+
+    }
+
+
+    // ======================================================
+    // 10. MODAL DATA
+    // ======================================================
+
+    function showDataModal() {
+
+      const modal =
+        document.getElementById("dataModal");
+
+      modal.classList.remove("modal-hidden");
+      modal.classList.add("flex");
+
+    }
+
+
+    function closeDataModal() {
+
+      const modal =
+        document.getElementById("dataModal");
+
+      modal.classList.add("modal-hidden");
+      modal.classList.remove("flex");
+
+    }
+
+
+    function openAddModal() {
+
+      document.getElementById(
+        "dataForm"
+      ).reset();
+
+      document.getElementById(
+        "editIndex"
+      ).value = "";
+
+      document.getElementById(
+        "modalTitle"
+      ).textContent = "Tambah Data";
+
+      document.getElementById(
+        "periode"
+      ).value = "120";
+
+      showDataModal();
+
+    }
+
+
+    function openEditModal(index) {
+
+      const row = globalData[index];
+
+      if (!row) return;
+
+      document.getElementById(
+        "editIndex"
+      ).value = index;
+
+      document.getElementById(
+        "modalTitle"
+      ).textContent = "Edit Data";
+
+      document.getElementById(
+        "namaMotor"
+      ).value = row[0];
+
+      document.getElementById(
+        "namaMesin"
+      ).value = row[1];
+
+      document.getElementById(
+        "subMesin"
+      ).value = row[2];
+
+      document.getElementById(
+        "tglTerakhir"
+      ).value = formatDateForInput(row[3]);
+
+      document.getElementById(
+        "personil"
+      ).value = row[4];
+
+      document.getElementById(
+        "keterangan"
+      ).value = row[5] || "BERKALA";
+
+      document.getElementById(
+        "periode"
+      ).value = row[6] || "120";
+
+      document.getElementById(
+        "tglSelanjutnya"
+      ).value = formatDateForInput(row[7]);
+
+      showDataModal();
+
+    }
+
+
+    // ======================================================
+    // 11. SUBMIT DATA TAMBAH / EDIT
+    // ======================================================
+
+    async function submitDataForm(event) {
+
+      event.preventDefault();
+
+      const editIndex =
+        document.getElementById(
+          "editIndex"
+        ).value;
+
+
+      const data = [
+
+        document.getElementById(
+          "namaMotor"
+        ).value.toUpperCase().trim(),
+
+        document.getElementById(
+          "namaMesin"
+        ).value.toUpperCase().trim(),
+
+        document.getElementById(
+          "subMesin"
+        ).value.toUpperCase().trim(),
+
+        formatDateForSheet(
+          document.getElementById(
+            "tglTerakhir"
+          ).value
+        ),
+
+        document.getElementById(
+          "personil"
+        ).value.toUpperCase().trim(),
+
+        document.getElementById(
+          "keterangan"
+        ).value.toUpperCase(),
+
+        document.getElementById(
+          "periode"
+        ).value || "120",
+
+        formatDateForSheet(
+          document.getElementById(
+            "tglSelanjutnya"
+          ).value
+        )
+
+      ];
+
+
+      if (editIndex !== "") {
+
+        await submitToServer(
+          {
+            action: "edit",
+            index: Number(editIndex) + 1,
+            data: data
+          },
+          "Data berhasil diperbarui"
+        );
+
+      } else {
+
+        await submitToServer(
+          {
+            action: "add",
+            data: data
+          },
+          "Data berhasil ditambahkan"
+        );
+
+      }
+
+    }
+
+
+    // ======================================================
+    // 12. KIRIM DATA KE APPS SCRIPT
+    // ======================================================
+
+    async function submitToServer(payload, successMessage) {
+
+      const saveButton =
+        document.getElementById("saveDataButton");
+
+      if (saveButton) {
+        saveButton.disabled = true;
+        saveButton.innerHTML =
+          '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Menyimpan...';
+      }
+
+      try {
+
+        const response = await fetch(
+          APPS_SCRIPT_URL,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify(payload)
+          }
+        );
+
+        const result = await response.text();
+
+        if (!response.ok) {
+          throw new Error(result || "Permintaan gagal.");
+        }
+
+        closeDataModal();
+
+        showNotification(
+          successMessage || result,
+          "success"
+        );
+
+        await loadData();
+
+      } catch (error) {
+
+        console.error(error);
+
+        showNotification(
+          "Gagal menyimpan data: " + error.message,
+          "error"
+        );
+
+      } finally {
+
+        if (saveButton) {
+
+          saveButton.disabled = false;
+
+          saveButton.innerHTML =
+            '<i class="fa-solid fa-floppy-disk mr-1"></i> Simpan';
 
         }
 
+      }
 
-        function formatDateForInput(dateStr) {
+    }
 
-            if (!dateStr) {
-                return new Date().toISOString().split('T')[0];
-            }
 
-            const parts = String(dateStr).split('-');
+    // ======================================================
+    // 13. HAPUS DATA
+    // ======================================================
 
-            if (parts.length !== 3) {
-                return new Date().toISOString().split('T')[0];
-            }
+    async function deleteData(index) {
 
-            let year = parts[2];
+      const row = globalData[index];
 
-            if (year.length === 2) {
-                year = "20" + year;
-            }
+      if (!row) return;
 
-            return `${year}-${parts[1]}-${parts[0]}`;
+      const confirmed = confirm(
+        "Yakin ingin menghapus data berikut?\n\n" +
+        row[0] +
+        "\n" +
+        row[1] +
+        "\n" +
+        row[2]
+      );
 
+      if (!confirmed) return;
+
+
+      try {
+
+        const response = await fetch(
+          APPS_SCRIPT_URL,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+              action: "delete",
+              index: index + 1
+            })
+          }
+        );
+
+        const result = await response.text();
+
+        if (!response.ok) {
+          throw new Error(result);
         }
 
+        showNotification(
+          "Data berhasil dihapus."
+        );
 
-        function formatDateFromInput(dateStr) {
+        await loadData();
 
-            const parts = dateStr.split('-');
+      } catch (error) {
 
-            if (parts.length !== 3) return "";
+        console.error(error);
 
-            const day = parts[2];
-            const month = parts[1];
-            const year = parts[0].slice(-2);
+        showNotification(
+          "Gagal menghapus data: " + error.message,
+          "error"
+        );
 
-            return `${day}-${month}-${year}`;
+      }
 
+    }
+
+
+    // ======================================================
+    // 14. SIMPAN KE DATABASE BULANAN
+    // ======================================================
+
+    async function saveToDatabase() {
+
+      const confirmed = confirm(
+        "Simpan seluruh data Sheet1 ke sheet riwayat bulanan?"
+      );
+
+      if (!confirmed) return;
+
+      try {
+
+        showNotification(
+          "Sedang menyimpan data ke riwayat...",
+          "warning"
+        );
+
+        const response = await fetch(
+          APPS_SCRIPT_URL,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+              action: "save_to_database"
+            })
+          }
+        );
+
+        const result = await response.text();
+
+        if (!response.ok) {
+          throw new Error(result);
         }
 
+        showNotification(
+          result,
+          "success"
+        );
 
-        function calculateNextDate(dateStr, period) {
+      } catch (error) {
 
-            const date = new Date(dateStr + "T00:00:00");
+        console.error(error);
 
-            date.setDate(
-                date.getDate() + Number(period || 120)
-            );
+        showNotification(
+          "Gagal menyimpan riwayat: " + error.message,
+          "error"
+        );
 
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = String(date.getFullYear()).slice(-2);
+      }
 
-            return `${day}-${month}-${year}`;
+    }
 
+
+    // ======================================================
+    // 15. MODAL SCRAPER
+    // ======================================================
+
+    function openScraperModal() {
+
+      const modal =
+        document.getElementById("scraperModal");
+
+      modal.classList.remove("modal-hidden");
+      modal.classList.add("flex");
+
+      document.getElementById(
+        "scraperDateForm"
+      ).classList.remove("hidden");
+
+      document.getElementById(
+        "scraperProgressArea"
+      ).classList.add("hidden");
+
+    }
+
+
+    function closeScraperModal() {
+
+      const modal =
+        document.getElementById("scraperModal");
+
+      modal.classList.add("modal-hidden");
+      modal.classList.remove("flex");
+
+      stopScraperPolling();
+
+    }
+
+
+    // ======================================================
+    // 16. TRIGGER SCRAPER
+    // ======================================================
+
+    async function triggerScraper() {
+
+      const dateFrom =
+        document.getElementById(
+          "scraperDateFrom"
+        ).value;
+
+      const dateTo =
+        document.getElementById(
+          "scraperDateTo"
+        ).value;
+
+
+      if (dateFrom && dateTo && dateFrom > dateTo) {
+
+        showNotification(
+          "Tanggal awal tidak boleh lebih besar dari tanggal akhir.",
+          "error"
+        );
+
+        return;
+
+      }
+
+
+      const button =
+        document.getElementById(
+          "triggerScraperButton"
+        );
+
+      button.disabled = true;
+
+      button.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Mengirim...';
+
+
+      try {
+
+        const response = await fetch(
+          APPS_SCRIPT_URL,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8"
+            },
+            body: JSON.stringify({
+              action: "trigger_scraper",
+              date_from: dateFrom,
+              date_to: dateTo
+            })
+          }
+        );
+
+        const result = await response.text();
+
+        if (!response.ok) {
+          throw new Error(result);
         }
 
-
-        // ====================================================
-        // 2. LOAD DATA
-        // ====================================================
-
-        async function loadData() {
-
-            try {
-
-                const response = await fetch(APPS_SCRIPT_URL);
-
-                const result = await response.json();
-
-                const tbody = document.getElementById('tableBody');
-
-                tbody.innerHTML = '';
-
-                if (!result || result.length <= 1) {
-
-                    globalData = [];
-
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="10"
-                                class="text-center py-6 text-slate-400">
-
-                                Tidak ada data ditemukan.
-
-                            </td>
-                        </tr>
-                    `;
-
-                    return;
-
-                }
-
-                globalData = result.slice(1).map(row => {
-
-                    // Format baru 8 kolom.
-                    // Tetap kompatibel dengan data lama 7 kolom.
-                    if (row.length === 7) {
-
-                        return [
-                            upper(row[0]),
-                            upper(row[1]),
-                            "",
-                            row[2],
-                            upper(row[3]),
-                            upper(row[4]),
-                            row[5],
-                            row[6]
-                        ];
-
-                    }
-
-                    return [
-                        upper(row[0]),
-                        upper(row[1]),
-                        upper(row[2]),
-                        row[3],
-                        upper(row[4]),
-                        upper(row[5]),
-                        row[6],
-                        row[7]
-                    ];
-
-                });
-
-                renderTable(globalData);
-
-            } catch (error) {
-
-                console.error("Gagal memuat data:", error);
-
-                document.getElementById('tableBody').innerHTML = `
-                    <tr>
-                        <td colspan="10"
-                            class="text-center py-6 text-rose-500">
-
-                            Gagal memuat data dari server.
-
-                        </td>
-                    </tr>
-                `;
-
-            }
-
+        if (result.toLowerCase().includes("error")) {
+          throw new Error(result);
         }
 
+        document.getElementById(
+          "scraperDateForm"
+        ).classList.add("hidden");
 
-        // ====================================================
-        // 3. TAMPILKAN DATA
-        // ====================================================
+        document.getElementById(
+          "scraperProgressArea"
+        ).classList.remove("hidden");
 
-        function renderTable(data) {
+        resetProgressDisplay();
 
-            const tbody = document.getElementById('tableBody');
+        showNotification(
+          "Scraper berhasil dipicu.",
+          "success"
+        );
 
-            tbody.innerHTML = '';
+        startScraperPolling();
 
-            if (!data || data.length === 0) {
+      } catch (error) {
 
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="10"
-                            class="text-center py-6 text-slate-400">
+        console.error(error);
 
-                            Tidak ada data yang sesuai.
+        showNotification(
+          "Gagal menjalankan scraper: " + error.message,
+          "error"
+        );
 
-                        </td>
-                    </tr>
-                `;
+      } finally {
 
-                return;
+        button.disabled = false;
 
-            }
+        button.innerHTML =
+          '<i class="fa-solid fa-play mr-1"></i> Mulai Scraper';
 
-            data.forEach((row, index) => {
+      }
 
-                const motor = escapeHtml(upper(row[0]) || '-');
-                const mesin = escapeHtml(upper(row[1]) || '-');
-                const subMesin = escapeHtml(upper(row[2]) || '-');
+    }
 
-                const tanggal = escapeHtml(row[3] || '-');
-                const personil = escapeHtml(upper(row[4]) || '-');
 
-                const ket = upper(row[5] || 'BERKALA');
+    // ======================================================
+    // 17. RESET TAMPILAN PROGRES
+    // ======================================================
 
-                const periodeVal = escapeHtml(row[6] || '120');
+    function resetProgressDisplay() {
 
-                const tanggalSelanjutnya = escapeHtml(row[7] || '-');
+      document.getElementById(
+        "progressPercent"
+      ).textContent = "0%";
 
-                const badgeClass =
-                    ket === 'PERBAIKAN'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-emerald-100 text-emerald-800';
+      document.getElementById(
+        "progressBar"
+      ).style.width = "0%";
 
-                const tr = document.createElement('tr');
+      document.getElementById(
+        "progressStage"
+      ).textContent = "Menunggu scraper";
 
-                tr.className = "hover:bg-slate-50 transition";
+      document.getElementById(
+        "progressDetail"
+      ).textContent = "Menunggu proses dimulai...";
 
-                tr.innerHTML = `
+      document.getElementById(
+        "progressUpdated"
+      ).textContent = "";
 
-                    <td class="py-3 px-4 text-center font-medium text-slate-500">
-                        ${index + 1}
-                    </td>
+      document.getElementById(
+        "progressResult"
+      ).classList.add("hidden");
 
-                    <td class="py-3 px-4 font-semibold text-slate-700">
-                        ${motor}
-                    </td>
+      document.getElementById(
+        "closeProgressButton"
+      ).classList.add("hidden");
 
-                    <td class="py-3 px-4">
-                        <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">
-                            ${mesin}
-                        </span>
-                    </td>
+      document.getElementById(
+        "progressStatusIcon"
+      ).innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i>';
 
-                    <td class="py-3 px-4">
-                        <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-semibold">
-                            ${subMesin}
-                        </span>
-                    </td>
+      document.getElementById(
+        "progressStatusIcon"
+      ).className = "text-blue-600";
 
-                    <td class="py-3 px-4 text-slate-600">
-                        ${tanggal}
-                    </td>
+    }
 
-                    <td class="py-3 px-4 text-slate-600">
-                        ${personil}
-                    </td>
 
-                    <td class="py-3 px-4">
-                        <span class="${badgeClass} px-2.5 py-1 rounded-full text-xs font-bold">
-                            ${escapeHtml(ket)}
-                        </span>
-                    </td>
+    // ======================================================
+    // 18. AMBIL PROGRES DARI APPS SCRIPT
+    // ======================================================
 
-                    <td class="py-3 px-4 text-center">
-                        <span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">
-                            ${periodeVal} HARI
-                        </span>
-                    </td>
+    async function getScraperProgress() {
 
-                    <td class="py-3 px-4 font-medium text-emerald-600">
-                        ${tanggalSelanjutnya}
-                    </td>
+      const response = await fetch(
+        APPS_SCRIPT_URL +
+        "?action=get_scraper_progress&t=" +
+        Date.now()
+      );
 
-                    <td class="py-3 px-4 text-center space-x-1">
+      if (!response.ok) {
+        throw new Error("Gagal mengambil progres scraper.");
+      }
 
-                        <button onclick="openEditModal(${index})"
-                                class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition">
+      return await response.json();
 
-                            <i class="fa-solid fa-pen"></i>
+    }
 
-                        </button>
 
-                        <button onclick="openDeleteModal(${index})"
-                                class="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs shadow-sm transition">
+    // ======================================================
+    // 19. UPDATE TAMPILAN PROGRES
+    // ======================================================
 
-                            <i class="fa-solid fa-trash"></i>
+    function updateProgressDisplay(progress) {
 
-                        </button>
+      const percent = Math.max(
+        0,
+        Math.min(
+          100,
+          Number(progress.percent || 0)
+        )
+      );
 
-                    </td>
+      document.getElementById(
+        "progressPercent"
+      ).textContent = percent + "%";
 
-                `;
+      document.getElementById(
+        "progressBar"
+      ).style.width = percent + "%";
 
-                tbody.appendChild(tr);
+      document.getElementById(
+        "progressStage"
+      ).textContent =
+        progress.stage || "Memproses";
 
-            });
+      document.getElementById(
+        "progressDetail"
+      ).textContent =
+        progress.detail || "Sedang memproses data...";
 
-        }
 
+      if (progress.updated_at) {
 
-        window.onload = loadData;
+        const updated = new Date(
+          progress.updated_at
+        );
 
+        document.getElementById(
+          "progressUpdated"
+        ).textContent =
+          "Update terakhir: " +
+          updated.toLocaleTimeString("id-ID");
 
-        // ====================================================
-        // 4. SORTING TANGGAL
-        // ====================================================
+      }
 
-        function parseLocalDate(dateStr) {
 
-            if (!dateStr) return new Date(0);
+      const status = String(
+        progress.status || "running"
+      ).toLowerCase();
 
-            const parts = String(dateStr).split('-');
+      const icon =
+        document.getElementById(
+          "progressStatusIcon"
+        );
 
-            if (parts.length !== 3) {
-                return new Date(0);
-            }
+      const bar =
+        document.getElementById(
+          "progressBar"
+        );
 
-            let year = Number(parts[2]);
+      const result =
+        document.getElementById(
+          "progressResult"
+        );
 
-            if (year < 100) {
-                year += 2000;
-            }
 
-            return new Date(
-                year,
-                Number(parts[1]) - 1,
-                Number(parts[0])
-            );
+      if (
+        status === "completed" ||
+        status === "success"
+      ) {
 
-        }
+        icon.innerHTML =
+          '<i class="fa-solid fa-circle-check"></i>';
 
+        icon.className = "text-emerald-600";
 
-        function toggleSortDate() {
+        bar.className =
+          "progress-transition bg-emerald-500 h-4 rounded-full";
 
-            sortAscending = !sortAscending;
+        result.className =
+          "mt-4 p-3 rounded-lg text-sm bg-emerald-50 text-emerald-800";
 
-            const sortIcon = document.getElementById('sortIcon');
+        result.textContent =
+          "Scraper berhasil diselesaikan.";
 
-            sortIcon.className = sortAscending
-                ? "fa-solid fa-sort-up ml-1 text-sky-400"
-                : "fa-solid fa-sort-down ml-1 text-sky-400";
+        document.getElementById(
+          "closeProgressButton"
+        ).classList.remove("hidden");
 
-            globalData.sort((a, b) => {
+        stopScraperPolling();
 
-                const dateA = parseLocalDate(a[7]);
-                const dateB = parseLocalDate(b[7]);
+        loadData();
 
-                return sortAscending
-                    ? dateA - dateB
-                    : dateB - dateA;
+      } else if (
+        status === "failed" ||
+        status === "error"
+      ) {
 
-            });
+        icon.innerHTML =
+          '<i class="fa-solid fa-circle-xmark"></i>';
 
-            renderTable(globalData);
+        icon.className = "text-red-600";
 
-        }
+        bar.className =
+          "progress-transition bg-red-500 h-4 rounded-full";
 
+        result.className =
+          "mt-4 p-3 rounded-lg text-sm bg-red-50 text-red-800";
 
-        // ====================================================
-        // 5. PENCARIAN
-        // ====================================================
+        result.textContent =
+          "Scraper gagal: " +
+          (progress.detail || "Periksa log GitHub Actions.");
 
-        function filterTable() {
+        document.getElementById(
+          "closeProgressButton"
+        ).classList.remove("hidden");
 
-            const input = upper(
-                document.getElementById('searchInput').value
-            );
+        stopScraperPolling();
 
-            const filtered = globalData.filter(row => {
+      } else {
 
-                return row.some(cell => {
+        icon.innerHTML =
+          '<i class="fa-solid fa-spinner fa-spin"></i>';
 
-                    return upper(cell).includes(input);
+        icon.className = "text-blue-600";
 
-                });
+        bar.className =
+          "progress-transition bg-blue-600 h-4 rounded-full";
 
-            });
+        result.classList.add("hidden");
 
-            renderTable(filtered);
+      }
 
-        }
+    }
 
 
-        // ====================================================
-        // 6. MODAL
-        // ====================================================
+    // ======================================================
+    // 20. POLLING PROGRES SCRAPER
+    // ======================================================
 
-        function showModal(
-            title,
-            messageHtml,
-            iconClass,
-            onConfirmCallback,
-            showFooter = true,
-            confirmBtnText = "Ya, Lanjutkan",
-            confirmBtnClass = "bg-pmpAccent hover:bg-pmpHover"
-        ) {
+    function startScraperPolling() {
 
-            document.getElementById('modalTitle').innerHTML = `
-                <i class="${iconClass} text-sky-400 mr-2"></i>
-                ${escapeHtml(title)}
-            `;
+      stopScraperPolling();
 
-            document.getElementById('modalBody').innerHTML = messageHtml;
+      // Ambil progres pertama kali.
+      checkScraperProgress();
 
-            document.getElementById('modalFooter').style.display =
-                showFooter ? 'flex' : 'none';
+      // Perbarui setiap 2 detik.
+      scraperPolling = setInterval(
+        checkScraperProgress,
+        2000
+      );
 
-            const confirmBtn =
-                document.getElementById('modalConfirmBtn');
+    }
 
-            confirmBtn.innerText = confirmBtnText;
 
-            confirmBtn.className =
-                `px-4 py-2 ${confirmBtnClass} text-white font-medium rounded-lg text-sm transition shadow-sm`;
+    async function checkScraperProgress() {
 
-            const modal = document.getElementById('customModal');
+      try {
 
-            const container = document.getElementById('modalContainer');
+        const progress =
+          await getScraperProgress();
 
-            modal.classList.remove('hidden');
+        updateProgressDisplay(progress);
 
-            setTimeout(() => {
+      } catch (error) {
 
-                modal.classList.remove('opacity-0');
+        console.error(
+          "Gagal membaca progres:",
+          error
+        );
 
-                container.classList.remove('scale-95');
+        document.getElementById(
+          "progressDetail"
+        ).textContent =
+          "Belum dapat membaca progres. Akan mencoba kembali...";
 
-                container.classList.add('scale-100');
+      }
 
-            }, 10);
+    }
 
-            const newBtn = confirmBtn.cloneNode(true);
 
-            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+    function stopScraperPolling() {
 
-            if (showFooter && onConfirmCallback) {
+      if (scraperPolling) {
 
-                newBtn.addEventListener('click', () => {
-                    onConfirmCallback();
-                });
+        clearInterval(scraperPolling);
 
-            }
+        scraperPolling = null;
 
-        }
+      }
 
+    }
 
-        function closeModal() {
 
-            const modal = document.getElementById('customModal');
+    // ======================================================
+    // 21. INISIALISASI
+    // ======================================================
 
-            const container = document.getElementById('modalContainer');
+    document.addEventListener(
+      "DOMContentLoaded",
+      function() {
 
-            modal.classList.add('opacity-0');
+        loadData();
 
-            container.classList.remove('scale-100');
+      }
+    );
 
-            container.classList.add('scale-95');
-
-            setTimeout(() => {
-                modal.classList.add('hidden');
-            }, 300);
-
-        }
-
-
-        function showNotification(
-            title,
-            message,
-            isSuccess = true
-        ) {
-
-            const icon = isSuccess
-                ? "fa-solid fa-circle-check text-emerald-500"
-                : "fa-solid fa-circle-exclamation text-rose-500";
-
-            const html = `
-                <div class="text-center py-3">
-
-                    <i class="${icon} text-4xl mb-3"></i>
-
-                    <p class="text-slate-800 font-semibold text-base">
-                        ${escapeHtml(message)}
-                    </p>
-
-                </div>
-            `;
-
-            showModal(
-                title,
-                html,
-                isSuccess
-                    ? "fa-solid fa-check"
-                    : "fa-solid fa-triangle-exclamation",
-                () => closeModal(),
-                true,
-                "Tutup",
-                isSuccess
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-rose-600 hover:bg-rose-700"
-            );
-
-        }
-
-
-        // ====================================================
-        // 7. SIMPAN KE DATABASE
-        // ====================================================
-
-        function triggerSaveDatabaseModal() {
-
-            const messageHtml = `
-
-                <div class="text-center py-2">
-
-                    <i class="fa-solid fa-database text-emerald-500 text-4xl mb-3"></i>
-
-                    <p class="text-slate-700 font-medium">
-
-                        Apakah Anda yakin ingin menyimpan seluruh data di tabel ini ke database sheet bulanan (<b>MMM-YY</b>)?
-
-                    </p>
-
-                    <p class="text-xs text-slate-400 mt-2">
-
-                        Data akan dipilah otomatis sesuai bulan penggantian terakhir.
-
-                    </p>
-
-                </div>
-
-            `;
-
-            showModal(
-                "Konfirmasi Simpan Database",
-                messageHtml,
-                "fa-solid fa-floppy-disk",
-                () => {
-
-                    submitToServer(
-                        { action: "save_to_database" },
-                        "Data berhasil disimpan ke sheet bulanan!"
-                    );
-
-                },
-                true,
-                "Ya, Simpan",
-                "bg-emerald-600 hover:bg-emerald-700"
-            );
-
-        }
-
-
-        // ====================================================
-        // 8. TAMBAH DATA
-        // ====================================================
-
-        function openAddModal() {
-
-            const today = new Date().toISOString().split('T')[0];
-
-            const htmlForm = `
-
-                <div class="space-y-4">
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MOTOR
-                        </label>
-
-                        <input type="text"
-                               id="inputMotor"
-                               placeholder="Masukkan nama motor..."
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MESIN
-                        </label>
-
-                        <input type="text"
-                               id="inputMesin"
-                               placeholder="Contoh: FS 8"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            SUB MESIN
-                        </label>
-
-                        <input type="text"
-                               id="inputSubMesin"
-                               placeholder="Contoh: STACKING / DESTACKING"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            TANGGAL PENGGANTIAN
-                        </label>
-
-                        <input type="date"
-                               id="inputTanggal"
-                               value="${today}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERIODE (HARI)
-                        </label>
-
-                        <input type="number"
-                               id="inputPeriode"
-                               value="120"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERSONIL
-                        </label>
-
-                        <input type="text"
-                               id="inputPersonil"
-                               placeholder="Nama personil..."
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            JENIS PEKERJAAN (KETERANGAN)
-                        </label>
-
-                        <select id="inputKeterangan"
-                                class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500 bg-white">
-
-                            <option value="BERKALA">BERKALA</option>
-                            <option value="PERBAIKAN">PERBAIKAN</option>
-
-                        </select>
-                    </div>
-
-                </div>
-
-            `;
-
-
-            showModal(
-                "Tambah Data Baru",
-                htmlForm,
-                "fa-solid fa-plus-circle",
-                () => {
-
-                    const motor = upper(
-                        document.getElementById('inputMotor').value
-                    );
-
-                    const mesin = upper(
-                        document.getElementById('inputMesin').value
-                    );
-
-                    const subMesin = upper(
-                        document.getElementById('inputSubMesin').value
-                    );
-
-                    const tglInput =
-                        document.getElementById('inputTanggal').value;
-
-                    const periodeVal =
-                        parseInt(document.getElementById('inputPeriode').value) || 120;
-
-                    const personil = upper(
-                        document.getElementById('inputPersonil').value
-                    );
-
-                    const ket = upper(
-                        document.getElementById('inputKeterangan').value
-                    );
-
-                    if (!motor || !mesin || !tglInput || !personil) {
-
-                        showNotification(
-                            "Peringatan",
-                            "Harap isi nama motor, nama mesin, tanggal, dan personil!",
-                            false
-                        );
-
-                        return;
-
-                    }
-
-                    const tglTerakhir =
-                        formatDateFromInput(tglInput);
-
-                    const tglSelanjutnya =
-                        calculateNextDate(tglInput, periodeVal);
-
-                    const newData = [
-
-                        motor,
-                        mesin,
-                        subMesin,
-                        tglTerakhir,
-                        personil,
-                        ket,
-                        String(periodeVal),
-                        tglSelanjutnya
-
-                    ];
-
-                    submitToServer(
-                        {
-                            action: "add",
-                            data: newData
-                        },
-                        "Data berhasil ditambahkan!"
-                    );
-
-                },
-                true,
-                "Simpan Data",
-                "bg-pmpAccent hover:bg-pmpHover"
-            );
-
-        }
-
-
-        // ====================================================
-        // 9. EDIT DATA
-        // ====================================================
-
-        function openEditModal(index) {
-
-            const row = globalData[index];
-
-            const formattedDate =
-                formatDateForInput(row[3]);
-
-            const currentPeriode = row[6] || '120';
-
-            const currentKet = upper(row[5] || 'BERKALA');
-
-            const htmlForm = `
-
-                <div class="space-y-4">
-
-                    <input type="hidden"
-                           id="editIndex"
-                           value="${index}">
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MOTOR
-                        </label>
-
-                        <input type="text"
-                               id="editMotor"
-                               value="${escapeHtml(row[0] || '')}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MESIN
-                        </label>
-
-                        <input type="text"
-                               id="editMesin"
-                               value="${escapeHtml(row[1] || '')}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            SUB MESIN
-                        </label>
-
-                        <input type="text"
-                               id="editSubMesin"
-                               value="${escapeHtml(row[2] || '')}"
-                               placeholder="STACKING / DESTACKING"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            TANGGAL PENGGANTIAN TERAKHIR
-                            <span class="text-xs text-slate-400 font-normal">
-                                (Tetap)
-                            </span>
-                        </label>
-
-                        <input type="date"
-                               id="editTanggal"
-                               value="${formattedDate}"
-                               class="w-full px-3 py-2 border rounded-md text-sm bg-slate-100 text-slate-500 cursor-not-allowed"
-                               disabled>
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERIODE (HARI)
-                        </label>
-
-                        <input type="number"
-                               id="editPeriode"
-                               value="${escapeHtml(currentPeriode)}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERSONIL
-                        </label>
-
-                        <input type="text"
-                               id="editPersonil"
-                               value="${escapeHtml(row[4] || '')}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            JENIS PEKERJAAN (KETERANGAN)
-                        </label>
-
-                        <select id="editKeterangan"
-                                class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500 bg-white">
-
-                            <option value="BERKALA"
-                                ${currentKet === 'BERKALA' ? 'selected' : ''}>
-                                BERKALA
-                            </option>
-
-                            <option value="PERBAIKAN"
-                                ${currentKet === 'PERBAIKAN' ? 'selected' : ''}>
-                                PERBAIKAN
-                            </option>
-
-                        </select>
-                    </div>
-
-                </div>
-
-            `;
-
-
-            showModal(
-                "Edit Data Pekerjaan",
-                htmlForm,
-                "fa-solid fa-pen-to-square",
-                () => {
-
-                    const idx =
-                        document.getElementById('editIndex').value;
-
-                    const motor = upper(
-                        document.getElementById('editMotor').value
-                    );
-
-                    const mesin = upper(
-                        document.getElementById('editMesin').value
-                    );
-
-                    const subMesin = upper(
-                        document.getElementById('editSubMesin').value
-                    );
-
-                    const tglInputBase =
-                        document.getElementById('editTanggal').value;
-
-                    const tglTerakhir = row[3];
-
-                    const periodeVal =
-                        parseInt(document.getElementById('editPeriode').value) || 120;
-
-                    const personil = upper(
-                        document.getElementById('editPersonil').value
-                    );
-
-                    const ket = upper(
-                        document.getElementById('editKeterangan').value
-                    );
-
-                    if (!motor || !mesin || !personil) {
-
-                        showNotification(
-                            "Peringatan",
-                            "Nama motor, nama mesin, dan personil wajib diisi!",
-                            false
-                        );
-
-                        return;
-
-                    }
-
-                    const tglSelanjutnya =
-                        calculateNextDate(
-                            tglInputBase,
-                            periodeVal
-                        );
-
-                    const updatedData = [
-
-                        motor,
-                        mesin,
-                        subMesin,
-                        tglTerakhir,
-                        personil,
-                        ket,
-                        String(periodeVal),
-                        tglSelanjutnya
-
-                    ];
-
-                    submitToServer(
-                        {
-                            action: "edit",
-                            index: parseInt(idx) + 1,
-                            data: updatedData
-                        },
-                        "Data berhasil diperbarui!"
-                    );
-
-                },
-                true,
-                "Simpan Perubahan",
-                "bg-pmpAccent hover:bg-pmpHover"
-            );
-
-        }
-
-
-        // ====================================================
-        // 10. HAPUS DATA
-        // ====================================================
-
-        function openDeleteModal(index) {
-
-            const row = globalData[index];
-
-            const messageHtml = `
-
-                <div class="text-center py-2">
-
-                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
-
-                    <p class="text-slate-700 font-medium">
-                        Apakah Anda yakin ingin menghapus data motor:
-                    </p>
-
-                    <p class="text-slate-900 font-bold mt-1">
-                        "${escapeHtml(row[0])}"
-                        (${escapeHtml(row[1])})
-                        - ${escapeHtml(row[2] || '-')}
-                    </p>
-
-                    <p class="text-xs text-slate-400 mt-2">
-                        Tindakan ini tidak dapat dibatalkan.
-                    </p>
-
-                </div>
-
-            `;
-
-            showModal(
-                "Konfirmasi Hapus Data",
-                messageHtml,
-                "fa-solid fa-trash-can",
-                () => {
-
-                    submitToServer(
-                        {
-                            action: "delete",
-                            index: index + 1
-                        },
-                        "Data berhasil dihapus!"
-                    );
-
-                },
-                true,
-                "Ya, Hapus",
-                "bg-rose-500 hover:bg-rose-600"
-            );
-
-        }
-
-
-        // ====================================================
-        // 11. KIRIM DATA KE APPS SCRIPT
-        // ====================================================
-
-        async function submitToServer(
-            payload,
-            successMessage
-        ) {
-
-            showModal(
-                "Sedang Memproses...",
-                `
-                    <div class="flex flex-col items-center py-4">
-
-                        <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
-
-                        <p class="text-sm text-slate-600">
-                            Menyimpan perubahan ke server...
-                        </p>
-
-                    </div>
-                `,
-                "fa-solid fa-sync",
-                null,
-                false
-            );
-
-            try {
-
-                const response = await fetch(
-                    APPS_SCRIPT_URL,
-                    {
-                        method: "POST",
-                        body: JSON.stringify(payload)
-                    }
-                );
-
-                const resText = await response.text();
-
-                closeModal();
-
-                if (resText.startsWith("Error:")) {
-
-                    showNotification(
-                        "Gagal",
-                        resText,
-                        false
-                    );
-
-                    return;
-
-                }
-
-                showNotification(
-                    "Berhasil",
-                    successMessage || resText,
-                    true
-                );
-
-                await loadData();
-
-            } catch (err) {
-
-                closeModal();
-
-                showNotification(
-                    "Gagal",
-                    "Terjadi kesalahan koneksi ke server.",
-                    false
-                );
-
-                console.error(err);
-
-            }
-
-        }
-
-
-        // ====================================================
-        // 12. TRIGGER SCRAPER
-        // ====================================================
-
-        function triggerScraperModal() {
-
-            const dateFrom =
-                document.getElementById('dateFrom').value;
-
-            const dateTo =
-                document.getElementById('dateTo').value;
-
-            showModal(
-                "Picu Tarik Data Otomatis",
-                `
-                    Sistem akan menjalankan GitHub Actions
-                    untuk mengambil data dari tanggal
-                    <b>${escapeHtml(dateFrom || 'DEFAULT')}</b>
-                    s/d
-                    <b>${escapeHtml(dateTo || 'DEFAULT')}</b>.
-                    Lanjutkan?
-                `,
-                "fa-solid fa-bolt",
-                () => {
-
-                    showModal(
-                        "Sedang Memproses...",
-                        `
-                            <div class="flex flex-col items-center py-4">
-
-                                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
-
-                                <p class="text-sm text-slate-600"
-                                   id="loadingText">
-
-                                    Memicu GitHub Actions...
-
-                                </p>
-
-                            </div>
-                        `,
-                        "fa-solid fa-sync",
-                        null,
-                        false
-                    );
-
-
-                    fetch(
-                        APPS_SCRIPT_URL,
-                        {
-                            method: "POST",
-                            body: JSON.stringify({
-                                action: "trigger_scraper",
-                                date_from: dateFrom,
-                                date_to: dateTo
-                            })
-                        }
-                    )
-
-                    .then(res => res.text())
-
-                    .then(resText => {
-
-                        if (resText.startsWith("Error:")) {
-
-                            closeModal();
-
-                            showNotification(
-                                "Gagal",
-                                resText,
-                                false
-                            );
-
-                            return;
-
-                        }
-
-                        const loadingText =
-                            document.getElementById('loadingText');
-
-                        if (loadingText) {
-                            loadingText.innerText =
-                                "Scraper dipicu! Memantau proses GitHub Actions...";
-                        }
-
-                        checkGitHubActionStatus();
-
-                    })
-
-                    .catch(err => {
-
-                        closeModal();
-
-                        showNotification(
-                            "Gagal",
-                            "Gagal memicu scraper.",
-                            false
-                        );
-
-                        console.error(err);
-
-                    });
-
-                },
-                true,
-                "Ya, Lanjutkan",
-                "bg-amber-500 hover:bg-amber-600"
-            );
-
-        }
-
-
-        // ====================================================
-        // 13. MONITOR GITHUB ACTIONS
-        // ====================================================
-
-        function checkGitHubActionStatus() {
-
-            const repoOwner = "laptoplenovopemper";
-
-            const repoName = "Scrapper_Job_Pemper";
-
-            const runsUrl =
-                `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs?per_page=1`;
-
-            const pollInterval = setInterval(async () => {
-
-                try {
-
-                    const response = await fetch(
-                        runsUrl,
-                        {
-                            headers: {
-                                "Accept": "application/vnd.github+json"
-                            }
-                        }
-                    );
-
-                    const data = await response.json();
-
-                    if (
-                        data.workflow_runs &&
-                        data.workflow_runs.length > 0
-                    ) {
-
-                        const latestRun =
-                            data.workflow_runs[0];
-
-                        const status =
-                            latestRun.status;
-
-                        const conclusion =
-                            latestRun.conclusion;
-
-                        const loadingText =
-                            document.getElementById('loadingText');
-
-                        if (loadingText) {
-
-                            loadingText.innerText =
-                                `Proses Server: ${upper(status)}...`;
-
-                        }
-
-                        if (status === "completed") {
-
-                            clearInterval(pollInterval);
-
-                            closeModal();
-
-                            if (conclusion === "success") {
-
-                                await loadData();
-
-                                showNotification(
-                                    "Berhasil",
-                                    "Scraper selesai dan data terbaru telah dimuat!",
-                                    true
-                                );
-
-                            } else {
-
-                                showNotification(
-                                    "Perhatian",
-                                    `Scraper selesai dengan status: ${upper(conclusion)}`,
-                                    false
-                                );
-
-                            }
-
-                        }
-
-                    }
-
-                } catch (e) {
-
-                    console.error(e);
-
-                }
-
-            }, 5000);
-
-        }
-
-    </script>
+  </script>
 
 </body>
 </html>
