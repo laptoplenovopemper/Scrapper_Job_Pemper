@@ -131,24 +131,37 @@
                     body: JSON.stringify({ action: "get_history_data" })
                 });
                 rawHistoryData = await response.json();
+                if (!Array.isArray(rawHistoryData)) {
+                    throw new Error('Format data history dari server bukan array.');
+                }
 
-                let motorMap = {};
+                // Gabungkan riwayat berdasarkan nama dasar motor.
+                // Keterangan kelompok seperti (FS 3 - PREPARATION) tidak menjadi pembeda,
+                // sehingga motor dengan nama/specifikasi sama tampil dalam satu baris.
+                const motorMap = new Map();
+
                 rawHistoryData.forEach(item => {
-                    let mName = item.namaMotor.trim();
-                    if (!motorMap[mName]) {
-                        motorMap[mName] = {
-                            namaMotor: mName,
+                    const namaAsli = normalizeMotorName(item.namaMotor || '');
+                    const namaDasar = getBaseMotorName(namaAsli);
+                    const groupKey = normalizeMotorKey(namaDasar);
+
+                    if (!groupKey) return;
+
+                    if (!motorMap.has(groupKey)) {
+                        motorMap.set(groupKey, {
+                            groupKey,
+                            namaMotor: namaDasar,
                             records: []
-                        };
+                        });
                     }
-                    motorMap[mName].records.push(item);
+                    motorMap.get(groupKey).records.push(item);
                 });
 
-                Object.values(motorMap).forEach(motor => {
+                for (const motor of motorMap.values()) {
                     motor.records.sort((a, b) => parseDateObj(a.tglPenggantian) - parseDateObj(b.tglPenggantian));
-                });
+                }
 
-                aggregatedData = Object.values(motorMap);
+                aggregatedData = Array.from(motorMap.values());
                 document.getElementById('totalMotor').innerText = aggregatedData.length;
                 renderHistoryTable(aggregatedData);
                 document.getElementById('selectAll').checked = false;
@@ -169,51 +182,95 @@
             return new Date(0);
         }
 
+        // Rapikan spasi dan karakter tersembunyi agar nama yang tampak sama
+        // tidak terpisah menjadi beberapa kelompok.
+        function normalizeMotorName(value) {
+            return String(value || '')
+                .normalize('NFKC')
+                .replace(/[\u00A0\u200B-\u200D\uFEFF]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        // Hapus hanya keterangan FS di ujung nama, bukan bagian nama/specifikasi motor.
+        function getBaseMotorName(value) {
+            return normalizeMotorName(value)
+                .replace(/\s*\(\s*FS\s*\d+\s*[-–—]\s*[^)]*\)\s*$/i, '')
+                .trim();
+        }
+
+        function normalizeMotorKey(value) {
+            return normalizeMotorName(value).toLocaleUpperCase('id-ID');
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[char]);
+        }
+
         window.onload = loadHistoryData;
 
         function renderHistoryTable(data) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
 
-            if (data.length === 0) {
+            if (!data.length) {
                 tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">Belum ada data history tersimpan.</td></tr>`;
                 return;
             }
 
             data.forEach((item, index) => {
-                let formattedDatesMMYY = item.records.map(r => {
-                    let p = r.tglPenggantian.split('-');
-                    return p.length === 3 ? `${p[1]}${p[2]}` : r.tglPenggantian;
+                const formattedDatesMMYY = item.records.map(r => {
+                    const p = String(r.tglPenggantian || '').split('-');
+                    return p.length === 3 ? `${p[1]}${p[2]}` : (r.tglPenggantian || '-');
                 });
 
-                let ketBadges = item.records.map(r => {
-                    let color = r.keterangan.toLowerCase() === 'perbaikan' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
-                    return `<span class="${color} px-2 py-0.5 rounded text-xs font-semibold mr-1">${r.keterangan}</span>`;
+                const ketBadges = item.records.map(r => {
+                    const jenis = String(r.keterangan || 'Berkala');
+                    const color = jenis.toLowerCase() === 'perbaikan'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-emerald-100 text-emerald-800';
+                    return `<span class="inline-block ${color} px-2 py-0.5 rounded text-xs font-semibold mr-1 mb-1">${escapeHtml(jenis)}</span>`;
                 }).join('');
 
-                let latestRecord = item.records.length > 0 ? item.records[item.records.length - 1] : null;
-                let latestNextDate = latestRecord ? latestRecord.tglSelanjutnya : '-';
-                let currentPeriode = latestRecord ? (latestRecord.periode || '120') : '120';
+                const latestRecord = item.records.length ? item.records[item.records.length - 1] : null;
+                const latestNextDate = latestRecord?.tglSelanjutnya || '-';
+                const currentPeriode = latestRecord?.periode || '120';
+                const recordRefs = item.records.map(r => ({
+                    sheetName: r.sheetName,
+                    rowIndex: Number(r.rowIndex)
+                }));
 
-                let tr = document.createElement('tr');
-                tr.className = "hover:bg-slate-50 transition";
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
                 tr.innerHTML = `
                     <td class="py-3 px-3 text-center">
-                        <input type="checkbox" class="row-checkbox rounded cursor-pointer" data-records='[${item.records.map(r => `{"sheetName":"${r.sheetName}","rowIndex":${r.rowIndex}}`).join(',')}]' onclick="toggleBulkDeleteButton()">
+                        <input type="checkbox" class="row-checkbox rounded cursor-pointer"
+                            data-records="${escapeHtml(JSON.stringify(recordRefs))}"
+                            onchange="toggleBulkDeleteButton()">
                     </td>
                     <td class="py-3 px-4 text-center font-medium text-slate-500">${index + 1}</td>
-                    <td class="py-3 px-4 font-semibold text-slate-700">${item.namaMotor}</td>
-                    <td class="py-3 px-4 text-slate-600 font-mono">${formattedDatesMMYY.join(', ')}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-700 min-w-[260px]">${escapeHtml(item.namaMotor)}</td>
+                    <td class="py-3 px-4 text-slate-600 font-mono">${formattedDatesMMYY.map(escapeHtml).join(', ')}</td>
                     <td class="py-3 px-4">${ketBadges}</td>
                     <td class="py-3 px-4 text-center font-bold text-sky-600">${item.records.length}x</td>
-                    <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${currentPeriode} Hari</span></td>
-                    <td class="py-3 px-4 font-medium text-emerald-600">${latestNextDate}</td>
-                    <td class="py-3 px-4 text-center space-x-1">
-                        <button onclick="openEditHistoryModal('${item.namaMotor}')" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button>
+                    <td class="py-3 px-4 text-center"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${escapeHtml(currentPeriode)} Hari</span></td>
+                    <td class="py-3 px-4 font-medium text-emerald-600 whitespace-nowrap">${escapeHtml(latestNextDate)}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button type="button" data-group-key="${escapeHtml(item.groupKey)}"
+                            onclick="openEditHistoryModalByButton(this)"
+                            class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"
+                            title="Edit seluruh riwayat motor"><i class="fa-solid fa-pen"></i></button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        function openEditHistoryModalByButton(button) {
+            const groupKey = button.getAttribute('data-group-key');
+            openEditHistoryModal(groupKey);
         }
 
         function toggleSortNextDate() {
@@ -303,9 +360,10 @@
             renderHistoryTable(filtered);
         }
 
-        function openEditHistoryModal(namaMotor) {
-            let motorObj = aggregatedData.find(m => m.namaMotor === namaMotor);
+        function openEditHistoryModal(groupKey) {
+            const motorObj = aggregatedData.find(m => m.groupKey === groupKey);
             if (!motorObj) return;
+            const namaMotor = motorObj.namaMotor;
 
             let recordsHtml = motorObj.records.map((rec, idx) => `
                 <div class="record-item p-3 bg-slate-50 border rounded-lg mb-3 space-y-2" data-sheet="${rec.sheetName}" data-row="${rec.rowIndex}">
