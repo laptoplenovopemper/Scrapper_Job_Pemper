@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -100,9 +101,6 @@
         let aggregatedData = [];
         let sortAscending = true;
 
-        // Nama pada database bulanan berbentuk: NAMA MOTOR (NAMA MESIN - SUB MESIN).
-        // Nama mesin (FS) dipisahkan agar pengelompokan menggunakan nama motor + FS.
-        // Dengan demikian motor yang sama di FS 3 dan FS 8 tidak tercampur.
         function splitMotorAndMachine(fullName) {
             const original = String(fullName || '').trim();
             const match = original.match(/\s*\((FS\s*\d+)\s*-\s*([^()]*)\)\s*$/i);
@@ -129,24 +127,24 @@
             return escapeHtml(value).replace(/`/g, '&#96;');
         }
 
+        async function postAction(payload) {
+            const response = await fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+
         async function loadHistoryData() {
             try {
-                const response = await fetch(APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'get_history_data' })
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const result = await response.json();
+                const result = await postAction({ action: 'get_history_data' });
                 if (!Array.isArray(result)) throw new Error('Format data history bukan array');
                 rawHistoryData = result;
 
                 const motorMap = new Map();
                 rawHistoryData.forEach(item => {
                     const parsed = splitMotorAndMachine(item.namaMotor);
-
-                    // Kunci pengelompokan: NAMA MOTOR + NAMA MESIN (FS).
-                    // Motor yang sama pada FS berbeda wajib menjadi baris terpisah.
-                    // Sub mesin tetap ditampilkan sebagai konteks di dalam kelompok FS yang sama.
                     const motorKey = normalizeGroupKey(parsed.motorName || item.namaMotor);
                     const machineKey = normalizeGroupKey(parsed.machineName || 'MESIN TIDAK DIKETAHUI');
                     const key = `${motorKey}||${machineKey}`;
@@ -159,8 +157,10 @@
                             machineContexts: []
                         });
                     }
+
                     const group = motorMap.get(key);
                     group.records.push({ ...item, parsedName: parsed });
+
                     if (parsed.machineName || parsed.subMachineName) {
                         const contextKey = normalizeGroupKey(`${parsed.machineName}|${parsed.subMachineName}`);
                         if (!group.machineContexts.some(ctx => ctx.key === contextKey)) {
@@ -207,6 +207,7 @@
         function renderHistoryTable(data) {
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = '';
+
             if (!data.length) {
                 tbody.innerHTML = `<tr><td colspan="9" class="text-center py-6 text-slate-400">Belum ada data history tersimpan.</td></tr>`;
                 document.getElementById('selectAll').checked = false;
@@ -225,6 +226,7 @@
                 const latestRecord = item.records.length ? item.records[item.records.length - 1] : null;
                 const latestNextDate = latestRecord?.tglSelanjutnya || '-';
                 const currentPeriode = latestRecord?.periode || '120';
+
                 const contextHtml = item.machineContexts.length
                     ? item.machineContexts.map(ctx => {
                         const machine = ctx.machineName ? `<span class="machine-chip"><i class="fa-solid fa-industry mr-1"></i>${escapeHtml(ctx.machineName)}</span>` : '';
@@ -239,16 +241,25 @@
                 tr.innerHTML = `
                     <td class="py-3 px-3 text-center align-top"><input type="checkbox" class="row-checkbox rounded cursor-pointer" data-records="${escapeAttr(JSON.stringify(recordRefs))}" onclick="toggleBulkDeleteButton()"></td>
                     <td class="py-3 px-4 text-center font-medium text-slate-500 align-top">${index + 1}</td>
-                    <td class="py-3 px-4 align-top"><div class="motor-name">${escapeHtml(item.namaMotor)}</div>${contextHtml}</td>
+                    <td class="py-3 px-4 align-top">
+                        <div class="motor-name">${escapeHtml(item.namaMotor)}</div>
+                        ${contextHtml}
+                    </td>
                     <td class="py-3 px-4 text-slate-600 font-mono align-top">${formattedDates.map(d => `<span class="inline-block mr-1 mb-1">${escapeHtml(d)}</span>`).join(', ')}</td>
                     <td class="py-3 px-4 align-top">${ketBadges}</td>
                     <td class="py-3 px-4 text-center font-bold text-sky-600 align-top">${item.records.length}x</td>
                     <td class="py-3 px-4 text-center align-top"><span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">${escapeHtml(currentPeriode)} Hari</span></td>
                     <td class="py-3 px-4 font-medium text-emerald-600 align-top">${escapeHtml(latestNextDate)}</td>
-                    <td class="py-3 px-4 text-center align-top"><button data-key="${escapeAttr(item.key)}" onclick="openEditHistoryModal(this.dataset.key)" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen"></i></button></td>
+                    <td class="py-3 px-4 text-center align-top">
+                        <div class="flex justify-center gap-1">
+                            <button data-key="${escapeAttr(item.key)}" onclick="openRenameMotorModal(this.dataset.key)" title="Edit Nama Motor" class="bg-sky-600 hover:bg-sky-700 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button data-key="${escapeAttr(item.key)}" onclick="openEditHistoryModal(this.dataset.key)" title="Kelola Riwayat" class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition"><i class="fa-solid fa-clock-rotate-left"></i></button>
+                        </div>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
+
             document.getElementById('selectAll').checked = false;
             toggleBulkDeleteButton();
         }
@@ -257,11 +268,13 @@
             sortAscending = !sortAscending;
             const sortIcon = document.getElementById('sortIcon');
             sortIcon.className = sortAscending ? 'fa-solid fa-sort-up ml-1 text-sky-400' : 'fa-solid fa-sort-down ml-1 text-sky-400';
+
             aggregatedData.sort((a, b) => {
                 const latestA = a.records.length ? a.records[a.records.length - 1].tglSelanjutnya : '';
                 const latestB = b.records.length ? b.records[b.records.length - 1].tglSelanjutnya : '';
                 return sortAscending ? parseDateObj(latestA) - parseDateObj(latestB) : parseDateObj(latestB) - parseDateObj(latestA);
             });
+
             renderHistoryTable(getFilteredData());
         }
 
@@ -281,21 +294,37 @@
         function confirmDeleteSelected() {
             const checkboxes = Array.from(document.querySelectorAll('.row-checkbox:checked'));
             if (!checkboxes.length) return;
-            const messageHtml = `<div class="text-center py-2"><i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i><p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus seluruh riwayat dari <b>${checkboxes.length}</b> motor terpilih?</p><p class="text-xs text-slate-400 mt-2">Semua catatan bulanan pada motor yang dipilih akan dihapus.</p></div>`;
+
+            const messageHtml = `
+                <div class="text-center py-2">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
+                    <p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus seluruh riwayat dari <b>${checkboxes.length}</b> motor terpilih?</p>
+                    <p class="text-xs text-slate-400 mt-2">Semua catatan bulanan pada motor yang dipilih akan dihapus.</p>
+                </div>`;
+
             showModal('Konfirmasi Hapus Massal', messageHtml, 'fa-solid fa-trash-can', () => executeBulkDelete(checkboxes), true, 'Ya, Hapus Semua', 'bg-rose-500 hover:bg-rose-600');
         }
 
         async function executeBulkDelete(checkboxes) {
             closeModal();
-            showModal('Sedang Memproses...', `<div class="flex flex-col items-center py-6"><i class="fa-solid fa-circle-notch fa-spin text-4xl text-sky-600 mb-3"></i><p class="text-sm font-semibold text-slate-700">Menghapus data terpilih secara massal...</p><p class="text-xs text-slate-400 mt-1">Mohon tunggu sebentar</p></div>`, 'fa-solid fa-sync', null, false);
+            showModal('Sedang Memproses...', `
+                <div class="flex flex-col items-center py-6">
+                    <i class="fa-solid fa-circle-notch fa-spin text-4xl text-sky-600 mb-3"></i>
+                    <p class="text-sm font-semibold text-slate-700">Menghapus data terpilih secara massal...</p>
+                    <p class="text-xs text-slate-400 mt-1">Mohon tunggu sebentar</p>
+                </div>`, 'fa-solid fa-sync', null, false);
+
             const allItemsToDelete = [];
             checkboxes.forEach(cb => {
-                try { JSON.parse(cb.getAttribute('data-records') || '[]').forEach(r => allItemsToDelete.push(r)); }
-                catch (e) { console.error('Data pilihan tidak valid', e); }
+                try {
+                    JSON.parse(cb.getAttribute('data-records') || '[]').forEach(r => allItemsToDelete.push(r));
+                } catch (e) {
+                    console.error('Data pilihan tidak valid', e);
+                }
             });
+
             try {
-                const response = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'delete_history', items: allItemsToDelete }) });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                await postAction({ action: 'delete_history', items: allItemsToDelete });
                 closeModal();
                 showNotification('Berhasil', 'Data terpilih berhasil dihapus secara massal!', true);
                 await loadHistoryData();
@@ -309,6 +338,7 @@
         function getFilteredData() {
             const input = document.getElementById('searchInput').value.toLowerCase().trim();
             if (!input) return aggregatedData;
+
             return aggregatedData.filter(row => {
                 const contexts = row.machineContexts.map(c => `${c.machineName} ${c.subMachineName}`).join(' ');
                 return `${row.namaMotor} ${contexts}`.toLowerCase().includes(input);
@@ -319,16 +349,127 @@
             renderHistoryTable(getFilteredData());
         }
 
+        // Fitur baru: edit nama motor.
+        // Backend Code.gs perlu menerima action "edit_motor_name".
+        async function openRenameMotorModal(groupKey) {
+            const motorObj = aggregatedData.find(m => m.key === groupKey);
+            if (!motorObj) return;
+
+            const contextText = motorObj.machineContexts
+                .map(c => `${c.machineName}${c.subMachineName ? ' - ' + c.subMachineName : ''}`)
+                .filter(Boolean)
+                .join(', ');
+
+            const body = `
+                <div class="space-y-3" id="renameMotorForm">
+                    <div class="rounded-lg bg-sky-50 border border-sky-100 p-3">
+                        <p class="text-xs text-slate-500 font-semibold mb-1">MESIN / SUB MESIN (TIDAK DIUBAH)</p>
+                        <p class="text-sm font-bold text-slate-700">${escapeHtml(contextText || '-')}</p>
+                    </div>
+                    <div>
+                        <label for="newMotorName" class="block text-xs font-bold text-slate-600 mb-1">NAMA MOTOR BARU</label>
+                        <input id="newMotorName" type="text" maxlength="250"
+                            class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-500"
+                            value="${escapeAttr(motorObj.namaMotor)}"
+                            placeholder="Masukkan nama motor baru">
+                        <p class="text-xs text-slate-400 mt-1">Perubahan akan diterapkan ke seluruh catatan motor ini pada mesin/FS yang sama.</p>
+                    </div>
+                </div>`;
+
+            showModal(
+                'Edit Nama Motor',
+                body,
+                'fa-solid fa-pen-to-square',
+                () => saveMotorName(groupKey),
+                true,
+                'Simpan Nama Motor',
+                'bg-sky-600 hover:bg-sky-700'
+            );
+
+            setTimeout(() => {
+                const input = document.getElementById('newMotorName');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 50);
+        }
+
+        async function saveMotorName(groupKey) {
+            const motorObj = aggregatedData.find(m => m.key === groupKey);
+            const input = document.getElementById('newMotorName');
+            if (!motorObj || !input) return;
+
+            const newName = input.value.trim();
+            if (!newName) {
+                input.focus();
+                showNotification('Nama Belum Diisi', 'Nama motor tidak boleh kosong.', false);
+                return;
+            }
+
+            if (newName === motorObj.namaMotor) {
+                closeModal();
+                return;
+            }
+
+            const items = motorObj.records.map(r => ({
+                sheetName: r.sheetName,
+                rowIndex: Number(r.rowIndex)
+            }));
+
+            closeModal();
+            showModal('Sedang Memproses...', `
+                <div class="flex flex-col items-center py-5">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
+                    <p class="text-sm font-semibold text-slate-700">Memperbarui nama motor...</p>
+                    <p class="text-xs text-slate-400 mt-1">Memproses ${items.length} catatan pada mesin/FS yang sama.</p>
+                </div>`, 'fa-solid fa-sync', null, false);
+
+            try {
+                const result = await postAction({
+                    action: 'edit_motor_name',
+                    newMotorName: newName,
+                    items
+                });
+
+                if (result && result.success === false) {
+                    throw new Error(result.message || 'Apps Script menolak perubahan nama motor.');
+                }
+
+                closeModal();
+                showNotification('Berhasil', 'Nama motor berhasil diperbarui pada seluruh riwayat mesin/FS ini.', true);
+                await loadHistoryData();
+            } catch (err) {
+                console.error('Gagal mengubah nama motor:', err);
+                closeModal();
+                showNotification('Gagal', err.message || 'Terjadi kesalahan saat mengubah nama motor. Pastikan aksi edit_motor_name sudah tersedia di Code.gs.', false);
+            }
+        }
+
         function openEditHistoryModal(groupKey) {
             const motorObj = aggregatedData.find(m => m.key === groupKey);
             if (!motorObj) return;
+
             const recordsHtml = motorObj.records.map(rec => `
-                <div class="record-item p-3 bg-slate-50 border rounded-lg mb-3 space-y-2" data-sheet="${escapeAttr(rec.sheetName)}" data-row="${Number(rec.rowIndex)}">
+                <div class="record-item p-3 bg-slate-50 border rounded-lg mb-3 space-y-2"
+                    data-sheet="${escapeAttr(rec.sheetName)}"
+                    data-row="${Number(rec.rowIndex)}">
                     <div class="flex justify-between items-center text-xs text-slate-500 font-semibold gap-2">
-                        <span>Bulan: ${escapeHtml(rec.sheetName)} | Tgl Penggantian: <span class="tgl-orig">${escapeHtml(rec.tglPenggantian || '')}</span></span>
-                        <button type="button" onclick="confirmDeleteHistoryRow(this.closest('.record-item').dataset.sheet, Number(this.closest('.record-item').dataset.row))" class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-0.5 rounded text-xs transition"><i class="fa-solid fa-trash mr-1"></i> Hapus</button>
+                        <span>Bulan: ${escapeHtml(rec.sheetName)} | Tgl Penggantian:
+                            <span class="tgl-orig">${escapeHtml(rec.tglPenggantian || '')}</span>
+                        </span>
+                        <button type="button"
+                            onclick="confirmDeleteHistoryRow(this.closest('.record-item').dataset.sheet, Number(this.closest('.record-item').dataset.row))"
+                            class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-0.5 rounded text-xs transition">
+                            <i class="fa-solid fa-trash mr-1"></i> Hapus
+                        </button>
                     </div>
-                    <div class="text-xs text-slate-600">${escapeHtml(rec.parsedName?.machineName || '')}${rec.parsedName?.subMachineName ? ' - ' + escapeHtml(rec.parsedName.subMachineName) : ''}</div>
+
+                    <div class="text-xs text-slate-600">
+                        ${escapeHtml(rec.parsedName?.machineName || '')}
+                        ${rec.parsedName?.subMachineName ? ' - ' + escapeHtml(rec.parsedName.subMachineName) : ''}
+                    </div>
+
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-400 mb-1">JENIS PEKERJAAN</label>
@@ -339,18 +480,42 @@
                         </div>
                         <div>
                             <label class="block text-[10px] font-semibold text-slate-400 mb-1">PERIODE (HARI)</label>
-                            <input type="number" min="1" class="periode-input w-full px-2 py-1.5 border rounded text-xs bg-white" value="${escapeAttr(rec.periode || 120)}" oninput="recalcNextDate(this)">
+                            <input type="number" min="1" class="periode-input w-full px-2 py-1.5 border rounded text-xs bg-white"
+                                value="${escapeAttr(rec.periode || 120)}" oninput="recalcNextDate(this)">
                         </div>
                     </div>
+
                     <div>
                         <label class="block text-[10px] font-semibold text-slate-400 mb-1">TANGGAL SELANJUTNYA</label>
-                        <input type="text" class="tgl-next-input w-full px-2 py-1.5 border rounded text-xs bg-slate-100 text-slate-600 font-medium" value="${escapeAttr(rec.tglSelanjutnya || '')}" readonly>
+                        <input type="text" class="tgl-next-input w-full px-2 py-1.5 border rounded text-xs bg-slate-100 text-slate-600 font-medium"
+                            value="${escapeAttr(rec.tglSelanjutnya || '')}" readonly>
                     </div>
                 </div>
             `).join('');
-            const contextsText = motorObj.machineContexts.map(c => `${c.machineName}${c.subMachineName ? ' - ' + c.subMachineName : ''}`).filter(Boolean).join(', ');
-            const modalBodyHtml = `<div class="space-y-3" id="editHistoryFormContainer"><div class="mb-3"><p class="text-xs font-bold text-slate-700">Motor: ${escapeHtml(motorObj.namaMotor)}</p><p class="text-xs text-slate-500 mt-1">Mesin / Sub Mesin: ${escapeHtml(contextsText || '-')}</p></div>${recordsHtml}</div>`;
-            showModal('Kelola Riwayat & Periode Motor', modalBodyHtml, 'fa-solid fa-clock-rotate-left', saveHistoryChanges, true, 'Simpan Perubahan', 'bg-pmpAccent hover:bg-pmpHover');
+
+            const contextsText = motorObj.machineContexts
+                .map(c => `${c.machineName}${c.subMachineName ? ' - ' + c.subMachineName : ''}`)
+                .filter(Boolean)
+                .join(', ');
+
+            const modalBodyHtml = `
+                <div class="space-y-3" id="editHistoryFormContainer">
+                    <div class="mb-3">
+                        <p class="text-xs font-bold text-slate-700">Motor: ${escapeHtml(motorObj.namaMotor)}</p>
+                        <p class="text-xs text-slate-500 mt-1">Mesin / Sub Mesin: ${escapeHtml(contextsText || '-')}</p>
+                    </div>
+                    ${recordsHtml}
+                </div>`;
+
+            showModal(
+                'Kelola Riwayat & Periode Motor',
+                modalBodyHtml,
+                'fa-solid fa-clock-rotate-left',
+                saveHistoryChanges,
+                true,
+                'Simpan Perubahan',
+                'bg-pmpAccent hover:bg-pmpHover'
+            );
         }
 
         function recalcNextDate(inputEl) {
@@ -358,7 +523,9 @@
             const tglOrigStr = container.querySelector('.tgl-orig').innerText;
             const periodeVal = Math.max(1, parseInt(inputEl.value, 10) || 120);
             const date = parseDateObj(tglOrigStr);
+
             if (date.getTime() === 0) return;
+
             date.setDate(date.getDate() + periodeVal);
             const dd = String(date.getDate()).padStart(2, '0');
             const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -369,24 +536,28 @@
         async function saveHistoryChanges() {
             const container = document.getElementById('editHistoryFormContainer');
             if (!container) return;
+
             const items = Array.from(container.querySelectorAll('.record-item'));
             closeModal();
-            showModal('Sedang Memproses...', `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menyimpan perubahan...</p></div>`, 'fa-solid fa-sync', null, false);
+
+            showModal('Sedang Memproses...', `
+                <div class="flex flex-col items-center py-4">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
+                    <p class="text-sm text-slate-600">Menyimpan perubahan...</p>
+                </div>`, 'fa-solid fa-sync', null, false);
+
             try {
                 for (const item of items) {
-                    const response = await fetch(APPS_SCRIPT_URL, {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            action: 'edit_history',
-                            sheetName: item.dataset.sheet,
-                            rowIndex: Number(item.dataset.row),
-                            keterangan: item.querySelector('.ket-input').value,
-                            periode: item.querySelector('.periode-input').value,
-                            tglSelanjutnya: item.querySelector('.tgl-next-input').value
-                        })
+                    await postAction({
+                        action: 'edit_history',
+                        sheetName: item.dataset.sheet,
+                        rowIndex: Number(item.dataset.row),
+                        keterangan: item.querySelector('.ket-input').value,
+                        periode: item.querySelector('.periode-input').value,
+                        tglSelanjutnya: item.querySelector('.tgl-next-input').value
                     });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 }
+
                 closeModal();
                 showNotification('Berhasil', 'Perubahan berhasil disimpan!', true);
                 await loadHistoryData();
@@ -398,19 +569,39 @@
         }
 
         function confirmDeleteHistoryRow(sheetName, rowIndex) {
-            const messageHtml = `<div class="text-center py-2"><i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i><p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus riwayat penggantian ini dari database bulanan?</p><p class="text-xs text-slate-400 mt-2">Tindakan ini tidak dapat dibatalkan.</p></div>`;
-            showModal('Konfirmasi Hapus Riwayat', messageHtml, 'fa-solid fa-trash-can', () => deleteHistoryRow(sheetName, rowIndex), true, 'Ya, Hapus', 'bg-rose-500 hover:bg-rose-600');
+            const messageHtml = `
+                <div class="text-center py-2">
+                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
+                    <p class="text-slate-700 font-medium">Apakah Anda yakin ingin menghapus riwayat penggantian ini dari database bulanan?</p>
+                    <p class="text-xs text-slate-400 mt-2">Tindakan ini tidak dapat dibatalkan.</p>
+                </div>`;
+
+            showModal(
+                'Konfirmasi Hapus Riwayat',
+                messageHtml,
+                'fa-solid fa-trash-can',
+                () => deleteHistoryRow(sheetName, rowIndex),
+                true,
+                'Ya, Hapus',
+                'bg-rose-500 hover:bg-rose-600'
+            );
         }
 
         async function deleteHistoryRow(sheetName, rowIndex) {
             closeModal();
-            showModal('Sedang Memproses...', `<div class="flex flex-col items-center py-4"><i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i><p class="text-sm text-slate-600">Menghapus data...</p></div>`, 'fa-solid fa-sync', null, false);
+
+            showModal('Sedang Memproses...', `
+                <div class="flex flex-col items-center py-4">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
+                    <p class="text-sm text-slate-600">Menghapus data...</p>
+                </div>`, 'fa-solid fa-sync', null, false);
+
             try {
-                const response = await fetch(APPS_SCRIPT_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'delete_history', items: [{ sheetName, rowIndex }] })
+                await postAction({
+                    action: 'delete_history',
+                    items: [{ sheetName, rowIndex }]
                 });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
                 closeModal();
                 showNotification('Berhasil', 'Riwayat berhasil dihapus!', true);
                 await loadHistoryData();
@@ -422,25 +613,49 @@
         }
 
         function showNotification(title, message, isSuccess = true) {
-            const icon = isSuccess ? 'fa-solid fa-circle-check text-emerald-500' : 'fa-solid fa-circle-exclamation text-rose-500';
-            const html = `<div class="text-center py-3"><i class="${icon} text-4xl mb-3"></i><p class="text-slate-800 font-semibold text-base">${escapeHtml(message)}</p></div>`;
-            showModal(title, html, isSuccess ? 'fa-solid fa-check' : 'fa-solid fa-triangle-exclamation', closeModal, true, 'Tutup', isSuccess ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700');
+            const icon = isSuccess
+                ? 'fa-solid fa-circle-check text-emerald-500'
+                : 'fa-solid fa-circle-exclamation text-rose-500';
+
+            const html = `
+                <div class="text-center py-3">
+                    <i class="${icon} text-4xl mb-3"></i>
+                    <p class="text-slate-800 font-semibold text-base">${escapeHtml(message)}</p>
+                </div>`;
+
+            showModal(
+                title,
+                html,
+                isSuccess ? 'fa-solid fa-check' : 'fa-solid fa-triangle-exclamation',
+                closeModal,
+                true,
+                'Tutup',
+                isSuccess ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+            );
         }
 
         function showModal(title, messageHtml, iconClass, onConfirmCallback, showFooter = true, confirmBtnText = 'Simpan', confirmBtnClass = 'bg-pmpAccent hover:bg-pmpHover') {
-            document.getElementById('modalTitle').innerHTML = `<i class="${iconClass} text-sky-400 mr-2"></i> ${escapeHtml(title)}`;
+            document.getElementById('modalTitle').innerHTML =
+                `<i class="${iconClass} text-sky-400 mr-2"></i> ${escapeHtml(title)}`;
+
             document.getElementById('modalBody').innerHTML = messageHtml;
             document.getElementById('modalFooter').style.display = showFooter ? 'flex' : 'none';
+
             const oldBtn = document.getElementById('modalConfirmBtn');
             const newBtn = oldBtn.cloneNode(true);
             newBtn.id = 'modalConfirmBtn';
             newBtn.innerText = confirmBtnText;
             newBtn.className = `px-4 py-2 ${confirmBtnClass} text-white font-medium rounded-lg text-sm transition shadow-sm`;
             oldBtn.parentNode.replaceChild(newBtn, oldBtn);
-            if (showFooter && onConfirmCallback) newBtn.addEventListener('click', onConfirmCallback);
+
+            if (showFooter && onConfirmCallback) {
+                newBtn.addEventListener('click', onConfirmCallback);
+            }
+
             const modal = document.getElementById('customModal');
             const modalContainer = document.getElementById('modalContainer');
             modal.classList.remove('hidden');
+
             setTimeout(() => {
                 modal.classList.remove('opacity-0');
                 modalContainer.classList.remove('scale-95');
@@ -451,9 +666,11 @@
         function closeModal() {
             const modal = document.getElementById('customModal');
             const modalContainer = document.getElementById('modalContainer');
+
             modal.classList.add('opacity-0');
             modalContainer.classList.remove('scale-100');
             modalContainer.classList.add('scale-95');
+
             setTimeout(() => modal.classList.add('hidden'), 300);
         }
     </script>
