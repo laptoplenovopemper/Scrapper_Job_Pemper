@@ -101,8 +101,8 @@
         let sortAscending = true;
 
         // Nama pada database bulanan berbentuk: NAMA MOTOR (NAMA MESIN - SUB MESIN).
-        // Jika nama mesin berupa FS 3/FS 8, bagian FS dipisahkan untuk pengelompokan,
-        // tetapi tetap ditampilkan sebagai informasi mesin pada tabel.
+        // Nama mesin (FS) dipisahkan agar pengelompokan menggunakan nama motor + FS.
+        // Dengan demikian motor yang sama di FS 3 dan FS 8 tidak tercampur.
         function splitMotorAndMachine(fullName) {
             const original = String(fullName || '').trim();
             const match = original.match(/\s*\((FS\s*\d+)\s*-\s*([^()]*)\)\s*$/i);
@@ -143,7 +143,14 @@
                 const motorMap = new Map();
                 rawHistoryData.forEach(item => {
                     const parsed = splitMotorAndMachine(item.namaMotor);
-                    const key = normalizeGroupKey(parsed.motorName || item.namaMotor);
+
+                    // Kunci pengelompokan: NAMA MOTOR + NAMA MESIN (FS).
+                    // Motor yang sama pada FS berbeda wajib menjadi baris terpisah.
+                    // Sub mesin tetap ditampilkan sebagai konteks di dalam kelompok FS yang sama.
+                    const motorKey = normalizeGroupKey(parsed.motorName || item.namaMotor);
+                    const machineKey = normalizeGroupKey(parsed.machineName || 'MESIN TIDAK DIKETAHUI');
+                    const key = `${motorKey}||${machineKey}`;
+
                     if (!motorMap.has(key)) {
                         motorMap.set(key, {
                             key,
