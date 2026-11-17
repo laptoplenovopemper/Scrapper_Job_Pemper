@@ -25,34 +25,34 @@
 
     <style>
         .machine-chip {
-            display:inline-flex;
-            align-items:center;
-            margin:2px 4px 2px 0;
-            padding:3px 7px;
-            border-radius:6px;
-            background:#eff6ff;
-            color:#1d4ed8;
-            font-size:11px;
-            font-weight:600;
-            white-space:normal;
+            display: inline-flex;
+            align-items: center;
+            margin: 2px 4px 2px 0;
+            padding: 3px 7px;
+            border-radius: 6px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: normal;
         }
 
         .submachine-chip {
-            display:inline-flex;
-            align-items:center;
-            margin:2px 4px 2px 0;
-            padding:3px 7px;
-            border-radius:6px;
-            background:#f1f5f9;
-            color:#475569;
-            font-size:11px;
-            font-weight:600;
-            white-space:normal;
+            display: inline-flex;
+            align-items: center;
+            margin: 2px 4px 2px 0;
+            padding: 3px 7px;
+            border-radius: 6px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: normal;
         }
 
         .motor-name {
-            font-weight:700;
-            color:#334155;
+            font-weight: 700;
+            color: #334155;
         }
 
         .record-item {
@@ -60,7 +60,31 @@
         }
 
         .record-item:hover {
-            background:#f8fafc;
+            background: #f8fafc;
+        }
+
+        .edit-field {
+            width: 100%;
+            padding: 9px 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            font-size: 12px;
+            background: white;
+            color: #334155;
+            outline: none;
+        }
+
+        .edit-field:focus {
+            border-color: #0284c7;
+            box-shadow: 0 0 0 2px #bae6fd;
+        }
+
+        .field-label {
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: #64748b;
+            margin-bottom: 5px;
         }
     </style>
 </head>
@@ -96,6 +120,7 @@
         </div>
     </header>
 
+
     <!-- MAIN -->
     <main class="max-w-7xl mx-auto px-4 py-6">
 
@@ -126,6 +151,7 @@
                     Hapus Terpilih (
                     <span id="selectedCount">0</span>
                     )
+
                 </button>
 
                 <div class="text-xs text-slate-500 font-medium">
@@ -135,6 +161,7 @@
 
             </div>
         </div>
+
 
         <!-- TABEL HISTORY -->
         <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
@@ -213,13 +240,14 @@
 
     </main>
 
+
     <!-- MODAL -->
     <div
         id="customModal"
         class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
 
         <div
-            class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300"
+            class="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden transform scale-95 transition-transform duration-300"
             id="modalContainer">
 
             <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
@@ -272,6 +300,7 @@
         </div>
     </div>
 
+
     <script>
 
         // =====================================================
@@ -323,22 +352,8 @@
 
 
         // =====================================================
-        // NORMALISASI KUNCI PENGELOMPOKAN
+        // 3. NORMALISASI KUNCI PENGELOMPOKAN
         // =====================================================
-        // Perubahan:
-        // - Huruf besar/kecil disamakan.
-        // - Spasi biasa dihilangkan.
-        // - Spasi berulang dihilangkan.
-        // - Non-breaking space juga dihilangkan.
-        // - Karakter Unicode dinormalisasi.
-        //
-        // Contoh:
-        // "SCREW CEMENT 2" = "SCREWCEMENT2"
-        // "SCREW  CEMENT 2" = "SCREWCEMENT2"
-        // "SCREWCEMENT2" = "SCREWCEMENT2"
-        //
-        // Hanya digunakan untuk membandingkan data.
-        // Nama asli yang ditampilkan tidak diubah.
 
         function normalizeGroupKey(name) {
 
@@ -351,7 +366,7 @@
 
 
         // =====================================================
-        // 3. KEAMANAN HTML
+        // 4. KEAMANAN HTML
         // =====================================================
 
         function escapeHtml(value) {
@@ -376,7 +391,7 @@
 
 
         // =====================================================
-        // 4. KOMUNIKASI APPS SCRIPT
+        // 5. KOMUNIKASI APPS SCRIPT
         // =====================================================
 
         async function postAction(payload) {
@@ -409,7 +424,7 @@
 
 
         // =====================================================
-        // 5. MEMUAT DATA HISTORY
+        // 6. MEMUAT DATA HISTORY
         // =====================================================
 
         async function loadHistoryData() {
@@ -432,17 +447,22 @@
 
                     const parsed = splitMotorAndMachine(item.namaMotor);
 
-                    // Nama motor dibandingkan tanpa spasi.
                     const motorKey = normalizeGroupKey(
                         parsed.motorName || item.namaMotor
                     );
 
-                    // FS juga dibandingkan tanpa spasi.
                     const machineKey = normalizeGroupKey(
                         parsed.machineName || 'MESIN TIDAK DIKETAHUI'
                     );
 
-                    // Kunci gabungan motor + FS.
+                    // Pengelompokan tetap berdasarkan:
+                    // Nama Motor + FS.
+                    //
+                    // Sub mesin tidak dimasukkan ke kunci.
+                    // Dengan demikian FORMING dan STACKING
+                    // pada FS yang sama tetap berada dalam
+                    // satu kelompok motor.
+
                     const key = `${motorKey}||${machineKey}`;
 
                     if (!motorMap.has(key)) {
@@ -480,6 +500,7 @@
 
                 });
 
+
                 aggregatedData = Array.from(motorMap.values());
 
                 aggregatedData.forEach(motor => {
@@ -491,6 +512,7 @@
                     );
 
                 });
+
 
                 document.getElementById('totalMotor').innerText =
                     aggregatedData.length;
@@ -520,7 +542,7 @@
 
 
         // =====================================================
-        // 6. FUNGSI TANGGAL
+        // 7. FUNGSI TANGGAL
         // =====================================================
 
         function parseDateObj(dateStr) {
@@ -562,7 +584,7 @@
 
 
         // =====================================================
-        // 7. MENAMPILKAN TABEL HISTORY
+        // 8. MENAMPILKAN TABEL HISTORY
         // =====================================================
 
         function renderHistoryTable(data) {
@@ -588,11 +610,13 @@
                 return;
             }
 
+
             data.forEach((item, index) => {
 
                 const formattedDates = item.records.map(
                     r => formatDateMMYY(r.tglPenggantian)
                 );
+
 
                 const ketBadges = item.records.map(r => {
 
@@ -610,6 +634,7 @@
                     `;
 
                 }).join('');
+
 
                 const latestRecord = item.records.length
                     ? item.records[item.records.length - 1]
@@ -726,7 +751,7 @@
                             <button
                                 data-key="${escapeAttr(item.key)}"
                                 onclick="openEditHistoryModal(this.dataset.key)"
-                                title="Edit Nama Motor dan Kelola Riwayat"
+                                title="Edit Nama Motor, Mesin, dan Sub Mesin"
                                 class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded text-xs shadow-sm transition">
 
                                 <i class="fa-solid fa-pen-to-square"></i>
@@ -744,6 +769,7 @@
 
             });
 
+
             document.getElementById('selectAll').checked = false;
 
             toggleBulkDeleteButton();
@@ -751,7 +777,7 @@
 
 
         // =====================================================
-        // 8. SORT TANGGAL SELANJUTNYA
+        // 9. SORT TANGGAL SELANJUTNYA
         // =====================================================
 
         function toggleSortNextDate() {
@@ -786,7 +812,7 @@
 
 
         // =====================================================
-        // 9. CHECKBOX DAN HAPUS MASSAL
+        // 10. CHECKBOX DAN HAPUS MASSAL
         // =====================================================
 
         function toggleSelectAll(masterCheckbox) {
@@ -824,6 +850,7 @@
 
             if (!checkboxes.length) return;
 
+
             const messageHtml = `
 
                 <div class="text-center py-2">
@@ -842,6 +869,7 @@
                 </div>
 
             `;
+
 
             showModal(
                 'Konfirmasi Hapus Massal',
@@ -930,7 +958,7 @@
 
 
         // =====================================================
-        // 10. PENCARIAN
+        // 11. PENCARIAN
         // =====================================================
 
         function getFilteredData() {
@@ -963,7 +991,7 @@
 
 
         // =====================================================
-        // 11. MODAL EDIT HISTORY DAN NAMA MOTOR
+        // 12. MODAL EDIT MOTOR, MESIN, SUB MESIN, DAN HISTORY
         // =====================================================
 
         function openEditHistoryModal(groupKey) {
@@ -973,25 +1001,16 @@
             if (!motorObj) return;
 
 
-            // Informasi mesin dan sub mesin.
-            const contextsText = motorObj.machineContexts
+            // Input nama motor berlaku untuk seluruh riwayat
+            // dalam satu kelompok motor + mesin.
 
-                .map(c =>
-                    `${c.machineName}${c.subMachineName ? ' - ' + c.subMachineName : ''}`
-                )
-
-                .filter(Boolean)
-                .join(', ');
-
-
-            // Input nama motor ditampilkan satu kali untuk satu kelompok.
             const motorNameHtml = `
 
                 <div class="bg-sky-50 border border-sky-200 rounded-lg p-4 mb-4">
 
                     <div class="flex items-center gap-2 mb-2">
 
-                        <i class="fa-solid fa-pen-to-square text-sky-600"></i>
+                        <i class="fa-solid fa-motorcycle text-sky-600"></i>
 
                         <label
                             for="editNamaMotor"
@@ -1013,8 +1032,8 @@
 
                     <p class="text-[11px] text-slate-500 mt-2">
 
-                        Nama motor baru akan diterapkan ke seluruh riwayat motor ini.
-                        Informasi FS dan Sub Mesin akan tetap dipertahankan.
+                        Nama motor baru akan diterapkan ke seluruh catatan riwayat
+                        dalam kelompok ini.
 
                     </p>
 
@@ -1023,131 +1042,211 @@
             `;
 
 
-            // Informasi mesin.
-            const machineInfoHtml = `
+            // Setiap record mempunyai input FS dan Sub Mesin sendiri.
+            // Jadi satu riwayat dapat diperbaiki tanpa mengubah
+            // mesin/sub mesin pada riwayat yang lainnya.
 
-                <div class="rounded-lg bg-slate-50 border border-slate-200 p-3 mb-4">
+            const recordsHtml = motorObj.records.map((rec, index) => {
 
-                    <p class="text-[10px] text-slate-400 font-bold mb-1">
-                        MESIN / SUB MESIN
-                    </p>
+                const parsed = rec.parsedName || splitMotorAndMachine(rec.namaMotor);
 
-                    <p class="text-sm font-bold text-slate-700">
-                        ${escapeHtml(contextsText || '-')}
-                    </p>
+                const machineValue = parsed.machineName || '';
 
-                </div>
-
-            `;
+                const subMachineValue = parsed.subMachineName || '';
 
 
-            // Form untuk setiap catatan history.
-            const recordsHtml = motorObj.records.map(rec => `
+                return `
 
-                <div
-                    class="record-item p-3 bg-white border border-slate-200 rounded-lg mb-3 space-y-3"
-                    data-sheet="${escapeAttr(rec.sheetName)}"
-                    data-row="${Number(rec.rowIndex)}">
+                    <div
+                        class="record-item p-4 bg-white border border-slate-200 rounded-lg mb-3 space-y-3"
+                        data-sheet="${escapeAttr(rec.sheetName)}"
+                        data-row="${Number(rec.rowIndex)}">
 
-                    <div class="flex justify-between items-center text-xs text-slate-500 font-semibold gap-2">
+                        <!-- HEADER RIWAYAT -->
 
-                        <span>
-                            Bulan:
-                            <b class="text-slate-700">
-                                ${escapeHtml(rec.sheetName)}
-                            </b>
+                        <div class="flex justify-between items-start gap-2">
 
-                            <br>
+                            <div class="text-xs text-slate-500 font-semibold">
 
-                            Tgl Penggantian:
-                            <span class="tgl-orig font-bold text-slate-700">
-                                ${escapeHtml(rec.tglPenggantian || '')}
-                            </span>
-                        </span>
+                                <div class="text-slate-800 font-bold text-sm mb-1">
 
-                        <button
-                            type="button"
-                            onclick="confirmDeleteHistoryRow(
-                                this.closest('.record-item').dataset.sheet,
-                                Number(this.closest('.record-item').dataset.row)
-                            )"
-                            class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-1 rounded text-xs transition">
+                                    <i class="fa-solid fa-clock-rotate-left text-sky-600 mr-1"></i>
 
-                            <i class="fa-solid fa-trash mr-1"></i>
-                            Hapus
+                                    Riwayat ${index + 1}
 
-                        </button>
+                                </div>
 
-                    </div>
+                                <span>
+                                    Bulan:
+                                    <b class="text-slate-700">
+                                        ${escapeHtml(rec.sheetName)}
+                                    </b>
+                                </span>
+
+                                <br>
+
+                                <span>
+                                    Tanggal Penggantian:
+                                    <b class="tgl-orig text-slate-700">
+                                        ${escapeHtml(rec.tglPenggantian || '')}
+                                    </b>
+                                </span>
+
+                            </div>
 
 
-                    <div class="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onclick="confirmDeleteHistoryRow(
+                                    this.closest('.record-item').dataset.sheet,
+                                    Number(this.closest('.record-item').dataset.row)
+                                )"
+                                class="bg-rose-500 hover:bg-rose-600 text-white px-2 py-1 rounded text-xs transition shrink-0">
 
-                        <div>
+                                <i class="fa-solid fa-trash mr-1"></i>
+                                Hapus
 
-                            <label class="block text-[10px] font-semibold text-slate-400 mb-1">
-                                JENIS PEKERJAAN
-                            </label>
-
-                            <select
-                                class="ket-input w-full px-2 py-2 border rounded text-xs bg-white">
-
-                                <option
-                                    value="Berkala"
-                                    ${String(rec.keterangan).toLowerCase() === 'berkala' ? 'selected' : ''}>
-
-                                    Berkala
-
-                                </option>
-
-                                <option
-                                    value="Perbaikan"
-                                    ${String(rec.keterangan).toLowerCase() === 'perbaikan' ? 'selected' : ''}>
-
-                                    Perbaikan
-
-                                </option>
-
-                            </select>
+                            </button>
 
                         </div>
 
 
+                        <!-- EDIT MESIN DAN SUB MESIN -->
+
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+
+                            <div class="flex items-center gap-2 mb-3">
+
+                                <i class="fa-solid fa-industry text-indigo-600"></i>
+
+                                <span class="text-xs font-bold text-indigo-800">
+                                    IDENTITAS MESIN
+                                </span>
+
+                            </div>
+
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+                                <div>
+
+                                    <label class="field-label">
+                                        MESIN / FS
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        class="machine-input edit-field font-bold"
+                                        maxlength="50"
+                                        value="${escapeAttr(machineValue)}"
+                                        placeholder="Contoh: FS 5">
+
+                                </div>
+
+
+                                <div>
+
+                                    <label class="field-label">
+                                        SUB MESIN
+                                    </label>
+
+                                    <input
+                                        type="text"
+                                        class="submachine-input edit-field font-bold"
+                                        maxlength="150"
+                                        value="${escapeAttr(subMachineValue)}"
+                                        placeholder="Contoh: FORMING">
+
+                                </div>
+
+                            </div>
+
+
+                            <p class="text-[10px] text-indigo-600 mt-2">
+
+                                <i class="fa-solid fa-circle-info mr-1"></i>
+
+                                Perubahan mesin dan sub mesin hanya berlaku untuk
+                                catatan riwayat ini.
+
+                            </p>
+
+                        </div>
+
+
+                        <!-- EDIT JENIS DAN PERIODE -->
+
+                        <div class="grid grid-cols-2 gap-3">
+
+                            <div>
+
+                                <label class="field-label">
+                                    JENIS PEKERJAAN
+                                </label>
+
+                                <select
+                                    class="ket-input edit-field">
+
+                                    <option
+                                        value="Berkala"
+                                        ${String(rec.keterangan || 'Berkala').toLowerCase() === 'berkala' ? 'selected' : ''}>
+
+                                        Berkala
+
+                                    </option>
+
+                                    <option
+                                        value="Perbaikan"
+                                        ${String(rec.keterangan || '').toLowerCase() === 'perbaikan' ? 'selected' : ''}>
+
+                                        Perbaikan
+
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+
+                            <div>
+
+                                <label class="field-label">
+                                    PERIODE (HARI)
+                                </label>
+
+                                <input
+                                    type="number"
+                                    min="1"
+                                    class="periode-input edit-field"
+                                    value="${escapeAttr(rec.periode || 120)}"
+                                    oninput="recalcNextDate(this)">
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- TANGGAL SELANJUTNYA -->
+
                         <div>
 
-                            <label class="block text-[10px] font-semibold text-slate-400 mb-1">
-                                PERIODE (HARI)
+                            <label class="field-label">
+                                TANGGAL SELANJUTNYA
                             </label>
 
                             <input
-                                type="number"
-                                min="1"
-                                class="periode-input w-full px-2 py-2 border rounded text-xs bg-white"
-                                value="${escapeAttr(rec.periode || 120)}"
-                                oninput="recalcNextDate(this)">
+                                type="text"
+                                class="tgl-next-input edit-field bg-slate-100 text-slate-600 font-medium"
+                                value="${escapeAttr(rec.tglSelanjutnya || '')}"
+                                readonly>
 
                         </div>
 
                     </div>
 
+                `;
 
-                    <div>
-
-                        <label class="block text-[10px] font-semibold text-slate-400 mb-1">
-                            TANGGAL SELANJUTNYA
-                        </label>
-
-                        <input
-                            type="text"
-                            class="tgl-next-input w-full px-2 py-2 border rounded text-xs bg-slate-100 text-slate-600 font-medium"
-                            value="${escapeAttr(rec.tglSelanjutnya || '')}"
-                            readonly>
-
-                    </div>
-
-                </div>
-
-            `).join('');
+            }).join('');
 
 
             const modalBodyHtml = `
@@ -1156,7 +1255,34 @@
 
                     ${motorNameHtml}
 
-                    ${machineInfoHtml}
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+
+                        <div class="flex items-start gap-2">
+
+                            <i class="fa-solid fa-lightbulb text-amber-600 mt-0.5"></i>
+
+                            <div>
+
+                                <p class="text-xs font-bold text-amber-800">
+                                    Petunjuk Edit Mesin dan Sub Mesin
+                                </p>
+
+                                <p class="text-[11px] text-amber-700 mt-1">
+
+                                    Setiap riwayat memiliki pengaturan mesin dan sub mesin
+                                    masing-masing. Jika ada kesalahan pengelompokan seperti
+                                    TB1 yang memiliki FORMING dan STACKING, ubah sub mesin
+                                    pada catatan yang salah saja.
+
+                                </p>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
 
                     <div class="mb-2">
 
@@ -1165,10 +1291,11 @@
                         </h4>
 
                         <p class="text-[11px] text-slate-400 mt-1">
-                            Perubahan nama motor berlaku untuk seluruh catatan di bawah ini.
+                            Periksa identitas mesin pada setiap riwayat sebelum menyimpan.
                         </p>
 
                     </div>
+
 
                     ${recordsHtml}
 
@@ -1178,7 +1305,7 @@
 
 
             showModal(
-                'Edit Nama Motor & Kelola Riwayat',
+                'Edit Motor, Mesin & Riwayat',
                 modalBodyHtml,
                 'fa-solid fa-pen-to-square',
                 saveHistoryChanges,
@@ -1188,7 +1315,6 @@
             );
 
 
-            // Fokus otomatis ke input nama motor.
             setTimeout(() => {
 
                 const input = document.getElementById('editNamaMotor');
@@ -1204,7 +1330,7 @@
 
 
         // =====================================================
-        // 12. HITUNG ULANG TANGGAL SELANJUTNYA
+        // 13. HITUNG ULANG TANGGAL SELANJUTNYA
         // =====================================================
 
         function recalcNextDate(inputEl) {
@@ -1238,7 +1364,7 @@
 
 
         // =====================================================
-        // 13. SIMPAN NAMA MOTOR DAN SELURUH RIWAYAT
+        // 14. SIMPAN MOTOR, MESIN, SUB MESIN, DAN HISTORY
         // =====================================================
 
         async function saveHistoryChanges() {
@@ -1250,7 +1376,10 @@
             if (!container) return;
 
 
-            // Ambil nama motor baru.
+            // ---------------------------------------------
+            // VALIDASI NAMA MOTOR
+            // ---------------------------------------------
+
             const motorInput = document.getElementById('editNamaMotor');
 
             if (!motorInput) return;
@@ -1286,7 +1415,10 @@
             }
 
 
-            // Ambil semua catatan riwayat.
+            // ---------------------------------------------
+            // AMBIL SEMUA RIWAYAT
+            // ---------------------------------------------
+
             const items = Array.from(
                 container.querySelectorAll('.record-item')
             );
@@ -1304,15 +1436,65 @@
             }
 
 
-            // Validasi periode sebelum dikirim.
+            // ---------------------------------------------
+            // VALIDASI MESIN, SUB MESIN, DAN PERIODE
+            // ---------------------------------------------
+
             for (const item of items) {
+
+                const machineName = item
+                    .querySelector('.machine-input')
+                    .value
+                    .trim();
+
+                const subMachineName = item
+                    .querySelector('.submachine-input')
+                    .value
+                    .trim();
 
                 const periode = parseInt(
                     item.querySelector('.periode-input').value,
                     10
                 );
 
+
+                if (!machineName) {
+
+                    const input = item.querySelector('.machine-input');
+
+                    input.focus();
+
+                    showNotification(
+                        'Mesin Belum Diisi',
+                        'Nama mesin / FS wajib diisi pada setiap riwayat.',
+                        false
+                    );
+
+                    return;
+                }
+
+
+                if (!subMachineName) {
+
+                    const input = item.querySelector('.submachine-input');
+
+                    input.focus();
+
+                    showNotification(
+                        'Sub Mesin Belum Diisi',
+                        'Nama sub mesin wajib diisi pada setiap riwayat.',
+                        false
+                    );
+
+                    return;
+                }
+
+
                 if (!Number.isInteger(periode) || periode <= 0) {
+
+                    const input = item.querySelector('.periode-input');
+
+                    input.focus();
 
                     showNotification(
                         'Periode Tidak Valid',
@@ -1326,8 +1508,11 @@
             }
 
 
-            closeModal();
+            // ---------------------------------------------
+            // KONFIRMASI PROSES
+            // ---------------------------------------------
 
+            closeModal();
 
             showModal(
                 'Sedang Memproses...',
@@ -1337,7 +1522,7 @@
                         <i class="fa-solid fa-circle-notch fa-spin text-4xl text-sky-600 mb-3"></i>
 
                         <p class="text-sm font-semibold text-slate-700">
-                            Menyimpan perubahan nama motor dan riwayat...
+                            Menyimpan perubahan motor, mesin, sub mesin, dan riwayat...
                         </p>
 
                         <p class="text-xs text-slate-400 mt-2">
@@ -1352,13 +1537,27 @@
             );
 
 
+            // ---------------------------------------------
+            // KIRIM PERUBAHAN KE APPS SCRIPT
+            // ---------------------------------------------
+
             try {
 
                 let successCount = 0;
 
 
-                // Kirim perubahan satu per satu ke setiap baris history.
                 for (const item of items) {
+
+                    const machineName = item
+                        .querySelector('.machine-input')
+                        .value
+                        .trim();
+
+                    const subMachineName = item
+                        .querySelector('.submachine-input')
+                        .value
+                        .trim();
+
 
                     const result = await postAction({
 
@@ -1368,9 +1567,19 @@
 
                         rowIndex: Number(item.dataset.row),
 
-                        // Nama motor baru dikirim ke Code.gs.
+
+                        // Nama motor berlaku untuk seluruh record.
                         namaMotor: namaMotorBaru,
 
+
+                        // Mesin dan sub mesin dikirim
+                        // secara terpisah untuk setiap record.
+                        machineName: machineName,
+
+                        subMachineName: subMachineName,
+
+
+                        // Data riwayat.
                         keterangan: item.querySelector('.ket-input').value,
 
                         periode: item.querySelector('.periode-input').value,
@@ -1398,12 +1607,11 @@
 
                 showNotification(
                     'Berhasil',
-                    `Nama motor dan ${successCount} catatan riwayat berhasil diperbarui!`,
+                    `Nama motor, mesin, sub mesin, dan ${successCount} catatan riwayat berhasil diperbarui!`,
                     true
                 );
 
 
-                // Muat ulang data dari database.
                 await loadHistoryData();
 
 
@@ -1425,7 +1633,7 @@
 
 
         // =====================================================
-        // 14. HAPUS SATU RIWAYAT
+        // 15. HAPUS SATU RIWAYAT
         // =====================================================
 
         function confirmDeleteHistoryRow(sheetName, rowIndex) {
@@ -1527,7 +1735,7 @@
 
 
         // =====================================================
-        // 15. NOTIFIKASI
+        // 16. NOTIFIKASI
         // =====================================================
 
         function showNotification(title, message, isSuccess = true) {
@@ -1567,7 +1775,7 @@
 
 
         // =====================================================
-        // 16. SISTEM MODAL
+        // 17. SISTEM MODAL
         // =====================================================
 
         function showModal(
