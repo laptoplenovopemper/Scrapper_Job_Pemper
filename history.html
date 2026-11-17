@@ -322,12 +322,30 @@
         }
 
 
+        // =====================================================
+        // NORMALISASI KUNCI PENGELOMPOKAN
+        // =====================================================
+        // Perubahan:
+        // - Huruf besar/kecil disamakan.
+        // - Spasi biasa dihilangkan.
+        // - Spasi berulang dihilangkan.
+        // - Non-breaking space juga dihilangkan.
+        // - Karakter Unicode dinormalisasi.
+        //
+        // Contoh:
+        // "SCREW CEMENT 2" = "SCREWCEMENT2"
+        // "SCREW  CEMENT 2" = "SCREWCEMENT2"
+        // "SCREWCEMENT2" = "SCREWCEMENT2"
+        //
+        // Hanya digunakan untuk membandingkan data.
+        // Nama asli yang ditampilkan tidak diubah.
+
         function normalizeGroupKey(name) {
 
             return String(name || '')
                 .normalize('NFKC')
                 .toUpperCase()
-                .replace(/[\u00A0\s]+/g, ' ')
+                .replace(/[\u00A0\s]+/g, '')
                 .trim();
         }
 
@@ -414,14 +432,17 @@
 
                     const parsed = splitMotorAndMachine(item.namaMotor);
 
+                    // Nama motor dibandingkan tanpa spasi.
                     const motorKey = normalizeGroupKey(
                         parsed.motorName || item.namaMotor
                     );
 
+                    // FS juga dibandingkan tanpa spasi.
                     const machineKey = normalizeGroupKey(
                         parsed.machineName || 'MESIN TIDAK DIKETAHUI'
                     );
 
+                    // Kunci gabungan motor + FS.
                     const key = `${motorKey}||${machineKey}`;
 
                     if (!motorMap.has(key)) {
