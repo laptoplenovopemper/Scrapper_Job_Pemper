@@ -1112,9 +1112,9 @@ def run_job_scraper(date_from, date_to):
 
                     # DATA BERKALA
                     keterangan = "Berkala"
-                    periode = "120"
+                    periode = "180"
 
-                    next_dt = dt_obj + timedelta(days=120)
+                    next_dt = dt_obj + timedelta(days=180)
 
                     tgl_selanjutnya = next_dt.strftime(
                         "%d-%m-%y"
@@ -1585,9 +1585,9 @@ def run_appsheet_scraper(date_from, date_to):
             )
 
             keterangan = "Perbaikan"
-            periode = "120"
+            periode = "180"
 
-            next_date = tanggal_obj + timedelta(days=120)
+            next_date = tanggal_obj + timedelta(days=180)
 
             tgl_selanjutnya = next_date.strftime(
                 "%d-%m-%y"
