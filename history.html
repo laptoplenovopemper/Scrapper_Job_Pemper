@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -1114,6 +1113,7 @@
 
                             <button
                                 type="button"
+                                title="Hapus hanya riwayat ini"
                                 onclick="confirmDeleteHistoryRow(
                                     this.closest('.record-item').dataset.sheet,
                                     Number(this.closest('.record-item').dataset.row)
@@ -1628,17 +1628,28 @@
 
         async function deleteHistoryRow(sheetName, rowIndex) {
 
+            const safeSheetName = String(sheetName || '').trim();
+            const safeRowIndex = Number(rowIndex);
+
+            if (!safeSheetName || !Number.isInteger(safeRowIndex) || safeRowIndex < 2) {
+                closeModal();
+                showNotification(
+                    'Gagal',
+                    'Identitas baris riwayat tidak valid. Muat ulang halaman lalu coba lagi.',
+                    false
+                );
+                return;
+            }
+
             closeModal();
 
             showModal(
                 'Sedang Memproses...',
                 `
                     <div class="flex flex-col items-center py-4">
-
                         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
-
                         <p class="text-sm text-slate-600">
-                            Menghapus data...
+                            Menghapus data dari database...
                         </p>
                     </div>
                 `,
@@ -1647,48 +1658,52 @@
                 false
             );
 
-
             try {
-
-                await postAction({
-
+                const result = await postAction({
                     action: 'delete_history',
-
                     items: [{
-                        sheetName,
-                        rowIndex
+                        sheetName: safeSheetName,
+                        rowIndex: safeRowIndex
                     }]
                 });
 
+                if (!result || result.success !== true) {
+                    throw new Error(
+                        result?.message || result?.error || 'Server tidak mengonfirmasi penghapusan.'
+                    );
+                }
 
                 closeModal();
 
-                showNotification(
-                    'Berhasil',
-                    'Riwayat berhasil dihapus!',
-                    true
-                );
+                if (Number(result.deleted || 0) < 1) {
+                    showNotification(
+                        'Tidak Ada Data Dihapus',
+                        result.message || 'Baris tersebut sudah tidak tersedia. Data akan dimuat ulang.',
+                        false
+                    );
+                } else {
+                    showNotification(
+                        'Berhasil',
+                        result.message || 'Riwayat berhasil dihapus!',
+                        true
+                    );
+                }
 
                 await loadHistoryData();
 
             } catch (err) {
-
-                console.error(err);
+                console.error('Gagal menghapus riwayat:', err);
 
                 closeModal();
 
                 showNotification(
                     'Gagal',
-                    'Gagal menghapus riwayat: ' + err.message,
+                    'Gagal menghapus riwayat: ' + (err.message || String(err)),
                     false
                 );
             }
         }
 
-
-        // =====================================================
-        // 16. NOTIFIKASI
-        // =====================================================
 
         function showNotification(title, message, isSuccess = true) {
 
