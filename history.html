@@ -707,7 +707,7 @@
 
                 const latestNextDate = latestRecord?.tglSelanjutnya || '-';
 
-                const currentPeriode = latestRecord?.periode || '120';
+                const currentPeriode = latestRecord?.periode || '180';
 
 
                 const contextHtml = item.machineContexts.length
@@ -1196,7 +1196,7 @@
                                     type="number"
                                     min="1"
                                     class="periode-input edit-field"
-                                    value="${escapeAttr(rec.periode || 120)}"
+                                    value="${escapeAttr(rec.periode || 180)}"
                                     oninput="recalcNextDate(this)">
                             </div>
                         </div>
@@ -1296,7 +1296,7 @@
 
             const periodeVal = Math.max(
                 1,
-                parseInt(inputEl.value, 10) || 120
+                parseInt(inputEl.value, 10) || 180
             );
 
             const date = parseDateObj(tglOrigStr);
