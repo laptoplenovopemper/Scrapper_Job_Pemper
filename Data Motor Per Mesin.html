@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Motor Per Mesin - PMP</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pmpDark: '#1e293b',
+                        pmpHeader: '#334155',
+                        pmpAccent: '#0284c7',
+                        pmpHover: '#0369a1'
+                    }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        .machine-button { transition: all .18s ease; }
+        .machine-button.active {
+            background: #0284c7;
+            color: white;
+            border-color: #0284c7;
+            box-shadow: 0 3px 8px rgba(2,132,199,.2);
+        }
+        .machine-button:not(.active):hover { background: #f0f9ff; border-color: #7dd3fc; color: #0369a1; }
+        .record-row:hover { background: #f8fafc; }
+        .type-chip { display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
+        .type-berkala { background:#dcfce7; color:#166534; }
+        .type-perbaikan { background:#ffedd5; color:#9a3412; }
+        .sub-chip { display:inline-block; padding:3px 8px; border-radius:6px; background:#f1f5f9; color:#475569; font-size:11px; font-weight:600; }
+        .table-scroll { scrollbar-width:thin; }
+        @media (max-width: 640px) { .machine-button { flex:1 1 calc(25% - 8px); } }
+    </style>
+</head>
+
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
+    <header class="bg-pmpDark text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-pmpAccent p-2 rounded-lg text-white">
+                    <i class="fa-solid fa-gears text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wide">Data Motor Per Mesin</h1>
+                    <p class="text-xs text-slate-300">Rekap data penggantian motor berdasarkan kelompok mesin FS1 sampai FS8</p>
+                </div>
+            </div>
+            <a href="index.html" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-arrow-left"></i> Kembali ke Dashboard
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="font-bold text-slate-800">Pilih Kelompok Mesin</h2>
+                    <p class="text-xs text-slate-500 mt-1">Tekan tombol FS untuk menampilkan daftar motor pada kelompok mesin tersebut.</p>
+                </div>
+                <button id="refreshButton" onclick="loadHistoryData(true)" class="px-3 py-2 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Muat Ulang Data
+                </button>
+            </div>
+
+            <div id="machineButtons" class="flex flex-wrap gap-2">
+                <button class="machine-button active border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold" data-machine="FS1" onclick="selectMachine('FS1')">FS1</button>
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600" data-machine="FS2" onclick="selectMachine('FS2')">FS2</button>
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600" data-machine="FS3" onclick="selectMachine('FS3')">FS3</button>
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600" data-machine="FS4" onclick="selectMachine('FS4')">FS4</button>
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600" data-machine="FS5" onclick="selectMachine('FS5')">FS5</button>
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600" data-machine="FS6" onclick="selectMachine('FS6')">FS6</button>
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600" data-machine="FS7" onclick="selectMachine('FS7')">FS7</button>
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600" data-machine="FS8" onclick="selectMachine('FS8')">FS8</button>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                <div class="flex items-center justify-between"><span class="text-xs text-slate-500 font-semibold">JUMLAH JENIS MOTOR</span><i class="fa-solid fa-gears text-sky-600"></i></div>
+                <div id="totalMotors" class="text-2xl font-bold text-slate-800 mt-2">—</div>
+            </div>
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                <div class="flex items-center justify-between"><span class="text-xs text-slate-500 font-semibold">TOTAL PENGGANTIAN</span><i class="fa-solid fa-repeat text-emerald-600"></i></div>
+                <div id="totalReplacements" class="text-2xl font-bold text-slate-800 mt-2">—</div>
+            </div>
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+                <div class="flex items-center justify-between"><span class="text-xs text-slate-500 font-semibold">KELOMPOK MESIN AKTIF</span><i class="fa-solid fa-industry text-indigo-600"></i></div>
+                <div id="activeMachineLabel" class="text-2xl font-bold text-slate-800 mt-2">FS1</div>
+            </div>
+        </section>
+
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                    <h2 id="tableTitle" class="font-bold text-slate-800">Daftar Motor — FS1</h2>
+                    <p id="tableDescription" class="text-xs text-slate-500 mt-1">Data dirangkum berdasarkan nama motor dan sub mesin.</p>
+                </div>
+                <div class="relative w-full md:w-72">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400"><i class="fa-solid fa-search text-xs"></i></span>
+                    <input id="searchInput" type="text" oninput="renderTable()" placeholder="Cari nama motor atau sub mesin..." class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
+                </div>
+            </div>
+
+            <div class="overflow-x-auto table-scroll">
+                <table class="w-full text-left border-collapse min-w-[1050px]">
+                    <thead>
+                        <tr class="bg-slate-800 text-white text-xs uppercase tracking-wider">
+                            <th class="py-3 px-4 text-center w-14">No</th>
+                            <th class="py-3 px-4">Nama Motor</th>
+                            <th class="py-3 px-4">Sub Mesin</th>
+                            <th class="py-3 px-4">Tanggal Penggantian</th>
+                            <th class="py-3 px-4">Jenis</th>
+                            <th class="py-3 px-4 text-center">Diganti (Kali)</th>
+                            <th class="py-3 px-4 text-center">Periode</th>
+                            <th class="py-3 px-4">Tanggal Selanjutnya</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody" class="divide-y divide-slate-200 text-sm">
+                        <tr><td colspan="8" class="text-center py-10 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i><br>Memuat data database...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row justify-between gap-2 text-xs text-slate-500">
+                <span id="recordCount">Menyiapkan data...</span>
+                <span id="lastUpdated">Belum ada pembaruan</span>
+            </div>
+        </section>
+
+        <p class="text-xs text-slate-400 mt-4"><i class="fa-solid fa-circle-info mr-1"></i> Jumlah penggantian dihitung dari seluruh catatan pada database bulanan untuk kombinasi nama motor dan sub mesin. Baris menampilkan catatan penggantian yang paling baru.</p>
+    </main>
+
+    <script>
+        // URL Web App sama dengan yang digunakan index.html.
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
+
+        let allHistoryData = [];
+        let selectedMachine = "FS1";
+        let isLoading = false;
+
+        function escapeHtml(value) {
+            return String(value == null ? "" : value).replace(/[&<>"']/g, function(char) {
+                return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char];
+            });
+        }
+
+        function normalizeMachine(value) {
+            const match = String(value || "").toUpperCase().match(/\bFS\s*0*(\d{1,2})\b/);
+            if (!match) return "";
+            const number = Number(match[1]);
+            return number >= 1 && number <= 8 ? "FS" + number : "";
+        }
+
+        function parseDate(value) {
+            if (!value) return null;
+            const text = String(value).trim();
+            let match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})$/);
+            if (match) {
+                let year = Number(match[3]);
+                if (year < 100) year += year <= 49 ? 2000 : 1900;
+                const date = new Date(year, Number(match[2]) - 1, Number(match[1]));
+                return date.getFullYear() === year && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[1]) ? date : null;
+            }
+            match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (match) {
+                const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+                return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[3]) ? date : null;
+            }
+            return null;
+        }
+
+        function dateTimestamp(value) {
+            const date = parseDate(value);
+            return date ? date.getTime() : 0;
+        }
+
+        function formatDate(value) {
+            const date = parseDate(value);
+            if (!date) return value ? String(value) : "—";
+            return String(date.getDate()).padStart(2, "0") + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getFullYear()).slice(-2);
+        }
+
+        function normalizeText(value) {
+            return String(value || "").toUpperCase().replace(/\s+/g, " ").trim();
+        }
+
+        function makeGroupKey(item) {
+            // FS dipisahkan melalui filter mesin; identitas rekap adalah nama motor + sub mesin.
+            return normalizeText(item.namaMotor) + "|" + normalizeText(item.subMesin);
+        }
+
+        function buildMachineSummary(machine) {
+            const rows = allHistoryData.filter(item => normalizeMachine(item.namaMesin) === machine);
+            const groups = new Map();
+
+            rows.forEach(item => {
+                const key = makeGroupKey(item);
+                if (!key || key === "|") return;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(item);
+            });
+
+            return Array.from(groups.values()).map(records => {
+                records.sort((a, b) => dateTimestamp(b.tglPenggantian) - dateTimestamp(a.tglPenggantian));
+                const latest = records[0];
+                return {
+                    namaMotor: latest.namaMotor || "—",
+                    subMesin: latest.subMesin || "—",
+                    tglPenggantian: latest.tglPenggantian || "",
+                    keterangan: normalizeText(latest.keterangan || "BERKALA"),
+                    diganti: records.length,
+                    periode: latest.periode || "—",
+                    tglSelanjutnya: latest.tglSelanjutnya || ""
+                };
+            }).sort((a, b) => a.namaMotor.localeCompare(b.namaMotor, "id") || a.subMesin.localeCompare(b.subMesin, "id"));
+        }
+
+        function selectMachine(machine) {
+            selectedMachine = machine;
+            document.querySelectorAll(".machine-button").forEach(button => {
+                const active = button.dataset.machine === machine;
+                button.classList.toggle("active", active);
+                button.classList.toggle("text-slate-600", !active);
+            });
+            document.getElementById("activeMachineLabel").textContent = machine;
+            document.getElementById("tableTitle").textContent = "Daftar Motor — " + machine;
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById("tableBody");
+            const search = normalizeText(document.getElementById("searchInput").value);
+            const data = buildMachineSummary(selectedMachine).filter(item => {
+                return !search || normalizeText(item.namaMotor + " " + item.subMesin).includes(search);
+            });
+
+            const totalReplacements = data.reduce((sum, item) => sum + item.diganti, 0);
+            document.getElementById("totalMotors").textContent = data.length.toLocaleString("id-ID");
+            document.getElementById("totalReplacements").textContent = totalReplacements.toLocaleString("id-ID");
+            document.getElementById("activeMachineLabel").textContent = selectedMachine;
+            document.getElementById("recordCount").textContent = data.length.toLocaleString("id-ID") + " jenis motor ditampilkan";
+
+            if (!allHistoryData.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10 text-slate-400">Database belum memiliki riwayat penggantian motor.</td></tr>';
+                return;
+            }
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10 text-slate-400"><i class="fa-solid fa-inbox text-2xl mb-2"></i><br>Tidak ada data motor untuk ' + escapeHtml(selectedMachine) + (search ? ' yang cocok dengan pencarian.' : '.') + '</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map((item, index) => {
+                const type = item.keterangan.includes("PERBAIKAN") ? "PERBAIKAN" : "BERKALA";
+                const typeClass = type === "PERBAIKAN" ? "type-perbaikan" : "type-berkala";
+                return `
+                    <tr class="record-row transition">
+                        <td class="py-3 px-4 text-center text-slate-400">${index + 1}</td>
+                        <td class="py-3 px-4"><div class="font-bold text-slate-700">${escapeHtml(item.namaMotor)}</div></td>
+                        <td class="py-3 px-4"><span class="sub-chip">${escapeHtml(item.subMesin)}</span></td>
+                        <td class="py-3 px-4 whitespace-nowrap">${escapeHtml(formatDate(item.tglPenggantian))}</td>
+                        <td class="py-3 px-4"><span class="type-chip ${typeClass}">${type}</span></td>
+                        <td class="py-3 px-4 text-center"><span class="inline-flex min-w-9 justify-center rounded-full bg-sky-50 text-sky-700 font-bold px-2.5 py-1">${item.diganti}x</span></td>
+                        <td class="py-3 px-4 text-center whitespace-nowrap">${escapeHtml(item.periode)} <span class="text-xs text-slate-400">hari</span></td>
+                        <td class="py-3 px-4 whitespace-nowrap">${escapeHtml(formatDate(item.tglSelanjutnya))}</td>
+                    </tr>`;
+            }).join("");
+        }
+
+        async function loadHistoryData(showMessage) {
+            if (isLoading) return;
+            isLoading = true;
+            const button = document.getElementById("refreshButton");
+            button.disabled = true;
+            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...';
+            document.getElementById("tableBody").innerHTML = '<tr><td colspan="8" class="text-center py-10 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i><br>Mengambil data dari Google Sheets...</td></tr>';
+
+            try {
+                const response = await fetch(APPS_SCRIPT_URL, {
+                    method: "POST",
+                    body: JSON.stringify({ action: "get_history_data" })
+                });
+                if (!response.ok) throw new Error("HTTP " + response.status);
+                const result = await response.json();
+                if (!Array.isArray(result)) throw new Error(result.error || result.message || "Format data dari server tidak sesuai.");
+                allHistoryData = result;
+                renderTable();
+                document.getElementById("lastUpdated").textContent = "Diperbarui: " + new Date().toLocaleString("id-ID");
+                if (showMessage) console.info("Data motor berhasil diperbarui.");
+            } catch (error) {
+                console.error(error);
+                document.getElementById("tableBody").innerHTML = '<tr><td colspan="8" class="text-center py-10 text-rose-500"><i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i><br>Gagal memuat data: ' + escapeHtml(error.message) + '<br><span class="text-xs text-slate-400">Pastikan URL Web App dan izin akses Google Apps Script sudah benar.</span></td></tr>';
+                document.getElementById("totalMotors").textContent = "—";
+                document.getElementById("totalReplacements").textContent = "—";
+                document.getElementById("recordCount").textContent = "Gagal memuat data";
+            } finally {
+                isLoading = false;
+                button.disabled = false;
+                button.innerHTML = '<i class="fa-solid fa-rotate-right mr-1"></i> Muat Ulang Data';
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            loadHistoryData(false);
+        });
+    </script>
+</body>
+</html>
