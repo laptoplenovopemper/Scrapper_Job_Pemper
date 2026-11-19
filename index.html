@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Pengecekan Berkala Motor - PMP</title>
+    <title>Data Motor Per Mesin - PMP</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
         tailwind.config = {
@@ -24,25 +25,106 @@
     </script>
 
     <style>
-        .progress-indeterminate {
-            width: 35%;
-            animation: progressMove 1.5s ease-in-out infinite;
+        .machine-button {
+            transition: all .18s ease;
         }
 
-        @keyframes progressMove {
-            0% { transform: translateX(-110%); }
-            100% { transform: translateX(310%); }
+        .machine-button.active {
+            background: #0284c7;
+            color: white;
+            border-color: #0284c7;
+            box-shadow: 0 3px 8px rgba(2,132,199,.2);
         }
 
-        .progress-bar {
-            transition: width 0.35s ease;
+        .machine-button:not(.active):hover {
+            background: #f0f9ff;
+            border-color: #7dd3fc;
+            color: #0369a1;
+        }
+
+        .record-row:hover {
+            background: #f8fafc;
+        }
+
+        .type-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .type-berkala {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .type-perbaikan {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+
+        .sub-chip {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .table-scroll {
+            scrollbar-width: thin;
+        }
+
+        .analysis-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 8px;
+            border-radius: 7px;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .status-good {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-danger {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .status-unknown {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 125px;
+            max-width: 170px;
+            margin: auto;
+        }
+
+        @media (max-width: 640px) {
+            .machine-button {
+                flex: 1 1 calc(25% - 8px);
+            }
         }
     </style>
 </head>
 
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
-    <!-- TOP NAVIGATION BAR -->
+    <!-- HEADER -->
     <header class="bg-pmpDark text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
 
@@ -53,1975 +135,1417 @@
 
                 <div>
                     <h1 class="text-lg font-bold tracking-wide">
-                        Data Pengecekan Berkala Motor
+                        Data Motor Per Mesin
                     </h1>
                     <p class="text-xs text-slate-300">
-                        Pemantauan otomatis penggantian motor dan jadwal berkala berikutnya
+                        Rekap data penggantian motor berdasarkan kelompok mesin FS1 sampai FS8
                     </p>
                 </div>
             </div>
 
             <div class="flex items-center justify-center gap-2">
+                <a href="Scrap.html"
+                   class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Ambil Data Baru
+                </a>
                 <a href="history.html"
                     class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     Lihat History Motor
                 </a>
-                <a href="Data%20Motor%20Per%20Mesin.html"
-                   class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
-                    <i class="fa-solid fa-gears"></i>
-                    Data Motor Per Mesin
-                </a>
             </div>
+
         </div>
     </header>
 
 
-    <!-- MAIN CONTAINER -->
     <main class="max-w-7xl mx-auto px-4 py-6">
 
-        <!-- FILTER & ACTION BAR -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+        <!-- PILIH MESIN -->
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 p-4 mb-6">
 
-            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
 
-                <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-sm">
-                    <span class="text-slate-500 mr-2">Dari</span>
-                    <input type="date"
-                           id="dateFrom"
-                           class="bg-transparent focus:outline-none text-slate-700 font-medium">
+                <div>
+                    <h2 class="font-bold text-slate-800">
+                        Pilih Kelompok Mesin
+                    </h2>
+
+                    <p class="text-xs text-slate-500 mt-1">
+                        Tekan tombol FS untuk menampilkan daftar motor pada kelompok mesin tersebut.
+                    </p>
                 </div>
 
-                <div class="flex items-center bg-slate-50 border border-slate-300 rounded-md px-3 py-1.5 text-sm">
-                    <span class="text-slate-500 mr-2">S/d</span>
-                    <input type="date"
-                           id="dateTo"
-                           class="bg-transparent focus:outline-none text-slate-700 font-medium">
-                </div>
+                <button id="refreshButton"
+                        onclick="loadHistoryData(true)"
+                        class="px-3 py-2 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-semibold transition">
 
-                <button onclick="triggerScraperModal()"
-                        class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm">
-                    <i class="fa-solid fa-bolt mr-2"></i>
-                    Tarik Data
-                </button>
+                    <i class="fa-solid fa-rotate-right mr-1"></i>
+                    Muat Ulang Data
 
-                <button onclick="triggerSaveDatabaseModal()"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm">
-                    <i class="fa-solid fa-floppy-disk mr-2"></i>
-                    Simpan ke Database
                 </button>
 
             </div>
 
-            <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+            <div id="machineButtons" class="flex flex-wrap gap-2">
 
-                <div class="relative w-full md:w-64">
+                <button class="machine-button active border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold"
+                        data-machine="FS1" onclick="selectMachine('FS1')">FS1</button>
+
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600"
+                        data-machine="FS2" onclick="selectMachine('FS2')">FS2</button>
+
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600"
+                        data-machine="FS3" onclick="selectMachine('FS3')">FS3</button>
+
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600"
+                        data-machine="FS4" onclick="selectMachine('FS4')">FS4</button>
+
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600"
+                        data-machine="FS5" onclick="selectMachine('FS5')">FS5</button>
+
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600"
+                        data-machine="FS6" onclick="selectMachine('FS6')">FS6</button>
+
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600"
+                        data-machine="FS7" onclick="selectMachine('FS7')">FS7</button>
+
+                <button class="machine-button border border-slate-300 rounded-md px-5 py-2.5 text-sm font-bold text-slate-600"
+                        data-machine="FS8" onclick="selectMachine('FS8')">FS8</button>
+
+            </div>
+
+        </section>
+
+
+        <!-- STATISTIK -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+
+            <!-- JUMLAH MOTOR -->
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500 font-semibold">
+                        JUMLAH JENIS MOTOR
+                    </span>
+
+                    <i class="fa-solid fa-gears text-sky-600"></i>
+                </div>
+
+                <div id="totalMotors"
+                     class="text-9xl font-bold text-slate-800 mt-2">
+                    —
+                </div>
+
+            </div>
+
+
+            <!-- TOTAL PENGGANTIAN -->
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-4">
+
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500 font-semibold">
+                        TOTAL PENGGANTIAN
+                    </span>
+
+                    <i class="fa-solid fa-repeat text-emerald-600"></i>
+                </div>
+
+                <div id="totalReplacements"
+                     class="text-9xl font-bold text-slate-800 mt-2">
+                    —
+                </div>
+
+            </div>
+
+
+            <!-- PIE CHART -->
+            <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-3">
+
+                <div class="flex items-center justify-between mb-2">
+
+                    <div>
+                        <span class="text-xs text-slate-600 font-bold">
+                            BERKALA VS PERBAIKAN
+                        </span>
+
+                        <p id="chartMachineLabel"
+                           class="text-xs text-slate-400 mt-1">
+                            Kelompok FS1
+                        </p>
+                    </div>
+
+                    <i class="fa-solid fa-chart-pie text-indigo-600"></i>
+
+                </div>
+
+                <div class="flex items-center gap-3">
+
+                    <div class="chart-container">
+                        <canvas id="replacementChart"></canvas>
+                    </div>
+
+                    <div class="flex-1 min-w-0 space-y-3">
+
+                        <div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                <span class="text-slate-500">Berkala</span>
+                            </div>
+
+                            <div id="berkalaPercentage"
+                                 class="text-lg font-bold text-emerald-600">
+                                0%
+                            </div>
+
+                            <div id="berkalaCount"
+                                 class="text-xs text-slate-400">
+                                0 penggantian
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                                <span class="text-slate-500">Perbaikan</span>
+                            </div>
+
+                            <div id="perbaikanPercentage"
+                                 class="text-lg font-bold text-orange-600">
+                                0%
+                            </div>
+
+                            <div id="perbaikanCount"
+                                 class="text-xs text-slate-400">
+                                0 penggantian
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- TABEL MOTOR -->
+        <section class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+
+            <div class="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+
+                <div>
+                    <h2 id="tableTitle" class="font-bold text-slate-800">
+                        Daftar Motor — FS1
+                    </h2>
+
+                    <p id="tableDescription" class="text-xs text-slate-500 mt-1">
+                        Data dirangkum berdasarkan nama motor dan sub mesin.
+                    </p>
+                </div>
+
+                <div class="relative w-full md:w-72">
+
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                         <i class="fa-solid fa-search text-xs"></i>
                     </span>
 
-                    <input type="text"
-                           id="searchInput"
-                           onkeyup="filterTable()"
-                           placeholder="Cari motor, mesin, atau sub mesin..."
-                           class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
+                    <input id="searchInput"
+                           type="text"
+                           oninput="renderTable()"
+                           placeholder="Cari nama motor atau sub mesin..."
+                           class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
+
                 </div>
 
-                <button onclick="openAddModal()"
-                        class="bg-pmpAccent hover:bg-pmpHover text-white font-medium px-4 py-2 rounded-md text-sm transition flex items-center shadow-sm whitespace-nowrap">
-                    <i class="fa-solid fa-plus mr-2"></i>
-                    Tambah Data Baru
-                </button>
-
             </div>
-        </div>
 
 
-        <!-- TABEL DATA -->
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto table-scroll">
 
-                <table class="w-full text-left border-collapse" id="dataTable">
+                <table class="w-full text-left border-collapse min-w-[1550px] table-fixed">
 
                     <thead>
                         <tr class="bg-slate-800 text-white text-xs uppercase tracking-wider">
-                            <th class="py-3 px-4 text-center w-12">No</th>
-                            <th class="py-3 px-4">Nama Motor</th>
-                            <th class="py-3 px-4">Nama Mesin</th>
+
+                            <th class="py-3 px-4 text-center w-14">No</th>
+
+                            <th class="py-3 px-4 w-[220px] min-w-[180px] max-w-[220px]">Nama Motor</th>
+
                             <th class="py-3 px-4">Sub Mesin</th>
-                            <th class="py-3 px-4">Tanggal Penggantian Berkala Terakhir</th>
-                            <th class="py-3 px-4">Personil</th>
-                            <th class="py-3 px-4">Keterangan</th>
+
+                            <th class="py-3 px-4">Tanggal Penggantian</th>
+
+                            <th class="py-3 px-4">Jenis</th>
+
+                            <th class="py-3 px-4 text-center">Diganti (Kali)</th>
+
                             <th class="py-3 px-4 text-center">Periode</th>
 
-                            <th class="py-3 px-4 cursor-pointer hover:bg-slate-700 transition select-none"
-                                onclick="toggleSortDate()">
-                                Tanggal Berkala Selanjutnya
-                                <i id="sortIcon" class="fa-solid fa-sort ml-1 text-slate-400"></i>
+                            <th class="py-3 px-4">Tanggal Selanjutnya</th>
+
+                            <th class="py-3 px-4 text-center">
+                                Analisa MTBF / MTTR / MTBR
                             </th>
 
-                            <th class="py-3 px-4 text-center">Aksi</th>
+                            <th class="py-3 px-4 text-center">
+                                Kondisi Motor
+                            </th>
+
                         </tr>
                     </thead>
 
-                    <tbody id="tableBody" class="divide-y divide-slate-200 text-sm">
+                    <tbody id="tableBody"
+                           class="divide-y divide-slate-200 text-sm">
+
                         <tr>
-                            <td colspan="10" class="text-center py-6 text-slate-400">
+                            <td colspan="10" class="text-center py-10 text-slate-400">
                                 <i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i>
                                 <br>
-                                Memuat data...
+                                Memuat data database...
                             </td>
                         </tr>
+
                     </tbody>
 
                 </table>
+
             </div>
-        </div>
+
+
+            <div class="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row justify-between gap-2 text-xs text-slate-500">
+
+                <span id="recordCount">
+                    Menyiapkan data...
+                </span>
+
+                <span id="lastUpdated">
+                    Belum ada pembaruan
+                </span>
+
+            </div>
+
+        </section>
+
+
+        <!-- KETERANGAN ANALISA -->
+        <section class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 mt-5">
+
+            <h3 class="font-bold text-sm text-slate-800 mb-3">
+                <i class="fa-solid fa-circle-info text-sky-600 mr-1"></i>
+                Keterangan Analisa Reliability Motor
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+
+                <div class="bg-sky-50 rounded-lg p-3">
+                    <div class="font-bold text-sky-700 mb-1">MTBF</div>
+                    <p class="text-slate-600">
+                        Mean Time Between Failures. Rata-rata jarak waktu antara dua kejadian kerusakan/perbaikan.
+                    </p>
+                </div>
+
+                <div class="bg-indigo-50 rounded-lg p-3">
+                    <div class="font-bold text-indigo-700 mb-1">MTTR</div>
+                    <p class="text-slate-600">
+                        Mean Time To Repair. Rata-rata waktu yang dibutuhkan untuk melakukan perbaikan motor.
+                    </p>
+                </div>
+
+                <div class="bg-emerald-50 rounded-lg p-3">
+                    <div class="font-bold text-emerald-700 mb-1">MTBR</div>
+                    <p class="text-slate-600">
+                        Mean Time Between Replacements. Rata-rata jarak waktu antara penggantian motor.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="mt-4 flex flex-wrap gap-3 text-xs">
+
+                <span class="analysis-chip status-good">
+                    <i class="fa-solid fa-circle-check"></i>
+                    GOOD
+                </span>
+
+                <span class="analysis-chip status-danger">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    DANGER
+                </span>
+
+                <span class="analysis-chip status-unknown">
+                    <i class="fa-solid fa-circle-info"></i>
+                    DATA KURANG
+                </span>
+
+            </div>
+
+            <p class="text-xs text-slate-400 mt-3">
+                Penilaian menggunakan ambang batas konfigurasi awal dan hanya dilakukan apabila ketiga parameter memiliki data yang mencukupi.
+            </p>
+
+        </section>
+
+
+        <p class="text-xs text-slate-400 mt-4">
+            <i class="fa-solid fa-circle-info mr-1"></i>
+            Jumlah penggantian dihitung dari seluruh catatan pada database untuk kombinasi nama motor dan sub mesin dalam kelompok mesin yang sama.
+        </p>
 
     </main>
 
 
-    <!-- MODAL -->
-    <div id="customModal"
-         class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4 transition-all opacity-0">
-
-        <div id="modalContainer"
-             class="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden transform scale-95 transition-transform duration-300">
-
-            <div class="bg-pmpDark text-white px-6 py-4 flex justify-between items-center">
-
-                <h3 id="modalTitle" class="font-bold text-base flex items-center gap-2">
-                    <i class="fa-solid fa-circle-info text-pmpAccent"></i>
-                    Konfirmasi Aksi
-                </h3>
-
-                <button onclick="closeModal()"
-                        class="text-slate-400 hover:text-white transition">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-
-            </div>
-
-            <div id="modalBody"
-                 class="p-6 text-slate-600 max-h-[75vh] overflow-y-auto">
-            </div>
-
-            <div id="modalFooter"
-                 class="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100">
-
-                <button onclick="closeModal()"
-                        class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg text-sm transition">
-                    Batal
-                </button>
-
-                <button id="modalConfirmBtn"
-                        class="px-4 py-2 bg-pmpAccent hover:bg-pmpHover text-white font-medium rounded-lg text-sm transition shadow-sm">
-                    Ya, Lanjutkan
-                </button>
-
-            </div>
-        </div>
-    </div>
-
-
     <script>
-        // ====================================================
+
+        // =========================================================
         // 1. KONFIGURASI
-        // ====================================================
+        // =========================================================
 
         const APPS_SCRIPT_URL =
             "https://script.google.com/macros/s/AKfycbyaKVBoR7ictxN1pYu0LAiaHARvltJlwlqV1wDsoz96_enjB7pi6bqAWLkHx-JTEnrx/exec";
 
-        const GITHUB_OWNER = "laptoplenovopemper";
-        const GITHUB_REPO = "Scrapper_Job_Pemper";
 
-        // Interval polling status backend (milidetik).
-        const PROGRESS_POLL_INTERVAL = 2000;
+        // Ambang batas awal penilaian.
+        // Silakan sesuaikan dengan standar maintenance PMP.
 
-        let globalData = [];
-        let sortAscending = true;
-
-        let progressPollTimer = null;
-        let scraperRunId = null;
-        let scraperPollingActive = false;
+        const RELIABILITY_LIMITS = {
+            minMtbfDays: 180,
+            maxMttrHours: 24,
+            minMtbrDays: 180
+        };
 
 
-        // ====================================================
-        // 2. UTILITAS UMUM
-        // ====================================================
+        let allHistoryData = [];
 
-        function upper(value) {
-            return String(value ?? "").toUpperCase();
-        }
+        let selectedMachine = "FS1";
 
+        let isLoading = false;
+
+        let replacementChart = null;
+
+
+        // =========================================================
+        // 2. FUNGSI UMUM
+        // =========================================================
 
         function escapeHtml(value) {
-            return String(value ?? "")
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+
+            return String(value == null ? "" : value)
+                .replace(/[&<>"']/g, function(char) {
+
+                    return {
+                        "&": "&amp;",
+                        "<": "&lt;",
+                        ">": "&gt;",
+                        '"': "&quot;",
+                        "'": "&#39;"
+                    }[char];
+
+                });
+
         }
 
 
-        function todayLocalInput() {
-            const now = new Date();
+        function normalizeMachine(value) {
 
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, "0");
-            const day = String(now.getDate()).padStart(2, "0");
+            const match = String(value || "")
+                .toUpperCase()
+                .match(/\bFS\s*0*(\d{1,2})\b/);
 
-            return `${year}-${month}-${day}`;
+            if (!match) return "";
+
+            const number = Number(match[1]);
+
+            return number >= 1 && number <= 8
+                ? "FS" + number
+                : "";
+
         }
 
 
-        /*
-         * Mengubah berbagai format tanggal menjadi komponen tanggal.
-         * Format yang didukung:
-         * - dd-MM-yy
-         * - dd-MM-yyyy
-         * - dd/MM/yyyy
-         * - yyyy-MM-dd
-         * - yyyy-MM-ddTHH:mm:ss
-         *
-         * Tidak menggunakan new Date(string) untuk format lokal
-         * agar tidak terjadi salah interpretasi tanggal.
-         */
-        function parseDateParts(value) {
-            if (value === null || value === undefined || value === "") {
-                return null;
-            }
+        function normalizeText(value) {
 
-            if (value instanceof Date) {
-                if (isNaN(value.getTime())) return null;
+            return String(value || "")
+                .toUpperCase()
+                .replace(/\s+/g, " ")
+                .trim();
 
-                return {
-                    year: value.getFullYear(),
-                    month: value.getMonth() + 1,
-                    day: value.getDate()
-                };
-            }
+        }
+
+
+        function normalizeType(value) {
+
+            const text = normalizeText(value);
+
+            return text.includes("PERBAIKAN")
+                ? "PERBAIKAN"
+                : "BERKALA";
+
+        }
+
+
+        // =========================================================
+        // 3. PARSING TANGGAL
+        // =========================================================
+
+        function parseDate(value) {
+
+            if (!value) return null;
 
             const text = String(value).trim();
 
-            if (
-                !text ||
-                text.toLowerCase() === "invalid date" ||
-                text.toLowerCase().includes("nan")
-            ) {
-                return null;
-            }
-
-            let match;
-
-            // Format ISO: yyyy-MM-dd atau yyyy-MM-ddTHH:mm:ss
-            match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:T.*)?$/);
+            let match = text.match(
+                /^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})$/
+            );
 
             if (match) {
-                return validateDateParts(
-                    Number(match[1]),
-                    Number(match[2]),
-                    Number(match[3])
-                );
-            }
 
-            // Format lokal: dd-MM-yyyy atau dd/MM/yyyy
-            match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
-
-            if (match) {
                 let year = Number(match[3]);
 
                 if (year < 100) {
-                    year += 2000;
+                    year += year <= 49 ? 2000 : 1900;
                 }
 
-                return validateDateParts(
+                const date = new Date(
                     year,
-                    Number(match[2]),
+                    Number(match[2]) - 1,
                     Number(match[1])
                 );
+
+                if (
+                    date.getFullYear() === year &&
+                    date.getMonth() === Number(match[2]) - 1 &&
+                    date.getDate() === Number(match[1])
+                ) {
+                    return date;
+                }
+
+                return null;
+
+            }
+
+
+            match = text.match(
+                /^(\d{4})-(\d{1,2})-(\d{1,2})/
+            );
+
+            if (match) {
+
+                const year = Number(match[1]);
+                const month = Number(match[2]) - 1;
+                const day = Number(match[3]);
+
+                const date = new Date(year, month, day);
+
+                if (
+                    date.getFullYear() === year &&
+                    date.getMonth() === month &&
+                    date.getDate() === day
+                ) {
+                    return date;
+                }
+
             }
 
             return null;
+
         }
 
 
-        function validateDateParts(year, month, day) {
-            if (
-                !Number.isInteger(year) ||
-                !Number.isInteger(month) ||
-                !Number.isInteger(day) ||
-                year < 1900 ||
-                month < 1 ||
-                month > 12 ||
-                day < 1 ||
-                day > 31
-            ) {
+        function dateTimestamp(value) {
+
+            const date = parseDate(value);
+
+            return date ? date.getTime() : 0;
+
+        }
+
+
+        function formatDate(value) {
+
+            const date = parseDate(value);
+
+            if (!date) {
+                return value ? String(value) : "—";
+            }
+
+            return String(date.getDate()).padStart(2, "0") +
+                "-" +
+                String(date.getMonth() + 1).padStart(2, "0") +
+                "-" +
+                String(date.getFullYear()).slice(-2);
+
+        }
+
+
+        // =========================================================
+        // 4. PERHITUNGAN JARAK ANTAR TANGGAL
+        // =========================================================
+
+        function getUniqueDates(records) {
+
+            const timestamps = records
+                .map(item => dateTimestamp(item.tglPenggantian))
+                .filter(timestamp => timestamp > 0);
+
+            return [...new Set(timestamps)].sort((a, b) => a - b);
+
+        }
+
+
+        function calculateAverageInterval(timestamps) {
+
+            if (timestamps.length < 2) {
                 return null;
             }
 
-            const date = new Date(year, month - 1, day);
+            let totalDays = 0;
 
-            if (
-                date.getFullYear() !== year ||
-                date.getMonth() !== month - 1 ||
-                date.getDate() !== day
-            ) {
-                return null;
+            for (let i = 1; i < timestamps.length; i++) {
+
+                const difference =
+                    (timestamps[i] - timestamps[i - 1]) /
+                    (1000 * 60 * 60 * 24);
+
+                totalDays += difference;
+
             }
 
-            return { year, month, day };
+            return totalDays / (timestamps.length - 1);
+
         }
 
 
-        function formatDateForInput(dateValue) {
-            const parts = parseDateParts(dateValue);
+        // =========================================================
+        // 5. PERHITUNGAN MTTR
+        // =========================================================
 
-            if (!parts) {
-                return "";
-            }
+        function calculateMTTR(records) {
 
-            const year = String(parts.year).padStart(4, "0");
-            const month = String(parts.month).padStart(2, "0");
-            const day = String(parts.day).padStart(2, "0");
-
-            return `${year}-${month}-${day}`;
-        }
-
-
-        function formatDateFromInput(dateValue) {
-            const parts = parseDateParts(dateValue);
-
-            if (!parts) {
-                return "";
-            }
-
-            const day = String(parts.day).padStart(2, "0");
-            const month = String(parts.month).padStart(2, "0");
-            const year = String(parts.year).slice(-2);
-
-            return `${day}-${month}-${year}`;
-        }
-
-
-        /*
-         * Menghitung tanggal berikutnya tanpa parsing tanggal
-         * menggunakan format string yang ambigu.
-         *
-         * Mengembalikan string kosong jika tanggal/periode tidak valid.
-         */
-        function calculateNextDate(dateValue, periodValue) {
-            const parts = parseDateParts(dateValue);
-            const period = Number(periodValue);
-
-            if (!parts) {
-                return "";
-            }
-
-            if (
-                !Number.isFinite(period) ||
-                !Number.isInteger(period) ||
-                period <= 0
-            ) {
-                return "";
-            }
-
-            const date = new Date(
-                parts.year,
-                parts.month - 1,
-                parts.day
+            const repairRecords = records.filter(item =>
+                normalizeType(item.keterangan) === "PERBAIKAN"
             );
 
-            date.setDate(date.getDate() + period);
+            const durations = repairRecords
+                .map(item => {
 
-            if (isNaN(date.getTime())) {
-                return "";
-            }
+                    // Field yang harus disediakan oleh Apps Script:
+                    // durasiPerbaikanJam
 
-            const day = String(date.getDate()).padStart(2, "0");
-            const month = String(date.getMonth() + 1).padStart(2, "0");
-            const year = String(date.getFullYear()).slice(-2);
+                    const value = Number(item.durasiPerbaikanJam);
 
-            return `${day}-${month}-${year}`;
-        }
+                    return Number.isFinite(value) && value >= 0
+                        ? value
+                        : null;
+
+                })
+                .filter(value => value !== null);
 
 
-        function getValidPeriod(value) {
-            const period = Number(value);
-
-            if (
-                !Number.isFinite(period) ||
-                !Number.isInteger(period) ||
-                period <= 0
-            ) {
+            if (!durations.length) {
                 return null;
             }
 
-            return period;
+            const total = durations.reduce(
+                (sum, value) => sum + value,
+                0
+            );
+
+            return total / durations.length;
+
         }
 
 
-        function parseServerResponse(text) {
-            try {
-                return JSON.parse(text);
-            } catch (error) {
-                return text;
+        // =========================================================
+        // 6. ANALISA MTBF, MTTR DAN MTBR
+        // =========================================================
+
+        function calculateReliability(records) {
+
+            const allDates = getUniqueDates(records);
+
+
+            // MTBF:
+            // Interval antara kejadian PERBAIKAN.
+
+            const repairRecords = records.filter(item =>
+                normalizeType(item.keterangan) === "PERBAIKAN"
+            );
+
+            const repairDates = getUniqueDates(repairRecords);
+
+            const mtbf = calculateAverageInterval(repairDates);
+
+
+            // MTTR:
+            // Rata-rata durasi perbaikan dalam jam.
+
+            const mttr = calculateMTTR(records);
+
+
+            // MTBR:
+            // Interval antara seluruh tanggal penggantian.
+
+            const mtbr = calculateAverageInterval(allDates);
+
+
+            return {
+                mtbf: mtbf,
+                mttr: mttr,
+                mtbr: mtbr
+            };
+
+        }
+
+
+        function formatMetric(value, unit) {
+
+            if (value === null || !Number.isFinite(value)) {
+                return "Belum tersedia";
             }
+
+            return value.toFixed(1) + " " + unit;
+
         }
 
 
-        async function postToServer(payload) {
-            const response = await fetch(APPS_SCRIPT_URL, {
-                method: "POST",
-                body: JSON.stringify(payload)
+        // =========================================================
+        // 7. PENILAIAN KONDISI MOTOR
+        // =========================================================
+
+        function evaluateCondition(analysis) {
+
+            const {
+                mtbf,
+                mttr,
+                mtbr
+            } = analysis;
+
+
+            // Jangan memberikan penilaian jika data belum lengkap.
+
+            if (
+                mtbf === null ||
+                mttr === null ||
+                mtbr === null
+            ) {
+
+                return {
+                    status: "UNKNOWN",
+                    label: "DATA KURANG",
+                    icon: "fa-circle-info",
+                    css: "status-unknown"
+                };
+
+            }
+
+
+            const good =
+                mtbf >= RELIABILITY_LIMITS.minMtbfDays &&
+                mttr <= RELIABILITY_LIMITS.maxMttrHours &&
+                mtbr >= RELIABILITY_LIMITS.minMtbrDays;
+
+
+            if (good) {
+
+                return {
+                    status: "GOOD",
+                    label: "GOOD",
+                    icon: "fa-circle-check",
+                    css: "status-good"
+                };
+
+            }
+
+
+            return {
+                status: "DANGER",
+                label: "DANGER",
+                icon: "fa-triangle-exclamation",
+                css: "status-danger"
+            };
+
+        }
+
+
+        // =========================================================
+        // 8. PENGELOMPOKAN MOTOR PER MESIN
+        // =========================================================
+
+        function makeGroupKey(item) {
+
+            return normalizeText(item.namaMotor) +
+                "|" +
+                normalizeText(item.subMesin);
+
+        }
+
+
+        function buildMachineSummary(machine) {
+
+            const rows = allHistoryData.filter(item =>
+                normalizeMachine(item.namaMesin) === machine
+            );
+
+
+            const groups = new Map();
+
+
+            rows.forEach(item => {
+
+                const key = makeGroupKey(item);
+
+                if (!key || key === "|") return;
+
+                if (!groups.has(key)) {
+                    groups.set(key, []);
+                }
+
+                groups.get(key).push(item);
+
             });
 
-            const responseText = await response.text();
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${responseText}`);
-            }
+            return Array.from(groups.values()).map(records => {
 
-            const result = parseServerResponse(responseText);
+                records.sort((a, b) =>
+                    dateTimestamp(b.tglPenggantian) -
+                    dateTimestamp(a.tglPenggantian)
+                );
 
-            if (
-                typeof result === "string" &&
-                result.trim().startsWith("Error:")
-            ) {
-                throw new Error(result);
-            }
 
-            if (
-                result &&
-                typeof result === "object" &&
-                result.ok === false
-            ) {
-                throw new Error(result.message || "Permintaan gagal diproses.");
-            }
+                const latest = records[0];
 
-            return result;
+
+                // Analisa hanya menggunakan riwayat motor
+                // dalam kelompok mesin yang sama.
+
+                const analysis = calculateReliability(records);
+
+                const condition = evaluateCondition(analysis);
+
+
+                return {
+
+                    namaMotor: latest.namaMotor || "—",
+
+                    subMesin: latest.subMesin || "—",
+
+                    tglPenggantian: latest.tglPenggantian || "",
+
+                    keterangan: normalizeType(
+                        latest.keterangan || "BERKALA"
+                    ),
+
+                    diganti: records.length,
+
+                    periode: latest.periode || "—",
+
+                    tglSelanjutnya: latest.tglSelanjutnya || "",
+
+                    mtbf: analysis.mtbf,
+
+                    mttr: analysis.mttr,
+
+                    mtbr: analysis.mtbr,
+
+                    condition: condition
+
+                };
+
+            }).sort((a, b) =>
+
+                a.namaMotor.localeCompare(b.namaMotor, "id") ||
+                a.subMesin.localeCompare(b.subMesin, "id")
+
+            );
+
         }
 
 
-        // ====================================================
-        // 3. LOAD DATA
-        // ====================================================
+        // =========================================================
+        // 9. PIE CHART BERKALA VS PERBAIKAN
+        // =========================================================
 
-        async function loadData() {
-            const tbody = document.getElementById("tableBody");
+        function updateReplacementChart(machine) {
 
-            try {
-                const response = await fetch(APPS_SCRIPT_URL);
+            const rows = allHistoryData.filter(item =>
+                normalizeMachine(item.namaMesin) === machine
+            );
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+
+            let berkala = 0;
+            let perbaikan = 0;
+
+
+            rows.forEach(item => {
+
+                if (normalizeType(item.keterangan) === "PERBAIKAN") {
+                    perbaikan++;
+                } else {
+                    berkala++;
                 }
 
-                const result = await response.json();
+            });
 
-                tbody.innerHTML = "";
 
-                if (!Array.isArray(result) || result.length <= 1) {
-                    globalData = [];
+            const total = berkala + perbaikan;
 
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="10" class="text-center py-6 text-slate-400">
-                                Tidak ada data ditemukan.
-                            </td>
-                        </tr>
-                    `;
 
-                    return;
-                }
+            const berkalaPercent = total
+                ? (berkala / total * 100)
+                : 0;
 
-                globalData = result.slice(1).map(row => {
-                    // Format lama 7 kolom.
-                    if (row.length === 7) {
-                        return [
-                            upper(row[0]),
-                            upper(row[1]),
-                            "",
-                            row[2],
-                            upper(row[3]),
-                            upper(row[4]),
-                            row[5],
-                            row[6]
-                        ];
+            const perbaikanPercent = total
+                ? (perbaikan / total * 100)
+                : 0;
+
+
+            document.getElementById("chartMachineLabel").textContent =
+                "Kelompok " + machine;
+
+
+            document.getElementById("berkalaPercentage").textContent =
+                berkalaPercent.toFixed(1) + "%";
+
+            document.getElementById("perbaikanPercentage").textContent =
+                perbaikanPercent.toFixed(1) + "%";
+
+
+            document.getElementById("berkalaCount").textContent =
+                berkala.toLocaleString("id-ID") + " penggantian";
+
+            document.getElementById("perbaikanCount").textContent =
+                perbaikan.toLocaleString("id-ID") + " penggantian";
+
+
+            const canvas = document.getElementById("replacementChart");
+
+
+            if (replacementChart) {
+                replacementChart.destroy();
+                replacementChart = null;
+            }
+
+
+            replacementChart = new Chart(canvas, {
+
+                type: "pie",
+
+                data: {
+
+                    labels: [
+                        "Berkala",
+                        "Perbaikan"
+                    ],
+
+                    datasets: [{
+
+                        data: total
+                            ? [berkala, perbaikan]
+                            : [1],
+
+                        backgroundColor: total
+                            ? ["#10b981", "#f97316"]
+                            : ["#e2e8f0"],
+
+                        borderColor: "#ffffff",
+
+                        borderWidth: 3,
+
+                        hoverOffset: 5
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    plugins: {
+
+                        legend: {
+                            display: false
+                        },
+
+                        tooltip: {
+
+                            enabled: total > 0,
+
+                            callbacks: {
+
+                                label: function(context) {
+
+                                    const value = context.raw;
+
+                                    const percentage =
+                                        (value / total * 100).toFixed(1);
+
+                                    return context.label +
+                                        ": " +
+                                        value +
+                                        " (" +
+                                        percentage +
+                                        "%)";
+
+                                }
+
+                            }
+
+                        }
+
                     }
 
-                    // Format baru 8 kolom.
-                    return [
-                        upper(row[0]),
-                        upper(row[1]),
-                        upper(row[2]),
-                        row[3],
-                        upper(row[4]),
-                        upper(row[5]),
-                        row[6],
-                        row[7]
-                    ];
-                });
+                }
 
-                renderTable(globalData);
+            });
 
-            } catch (error) {
-                console.error("Gagal memuat data:", error);
-
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="10" class="text-center py-6 text-rose-500">
-                            Gagal memuat data dari server.
-                        </td>
-                    </tr>
-                `;
-            }
         }
 
 
-        // ====================================================
-        // 4. TAMPILKAN DATA
-        // ====================================================
+        // =========================================================
+        // 10. MEMILIH KELOMPOK MESIN
+        // =========================================================
 
-        function renderTable(data) {
+        function selectMachine(machine) {
+
+            selectedMachine = machine;
+
+
+            document.querySelectorAll(".machine-button").forEach(button => {
+
+                const active =
+                    button.dataset.machine === machine;
+
+                button.classList.toggle("active", active);
+
+                button.classList.toggle(
+                    "text-slate-600",
+                    !active
+                );
+
+            });
+
+
+            document.getElementById("tableTitle").textContent =
+                "Daftar Motor — " + machine;
+
+
+            document.getElementById("searchInput").value = "";
+
+
+            updateReplacementChart(machine);
+
+            renderTable();
+
+        }
+
+
+        // =========================================================
+        // 11. MENAMPILKAN TABEL
+        // =========================================================
+
+        function renderTable() {
+
             const tbody = document.getElementById("tableBody");
 
-            tbody.innerHTML = "";
 
-            if (!data || data.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="10" class="text-center py-6 text-slate-400">
-                            Tidak ada data yang sesuai.
-                        </td>
-                    </tr>
-                `;
-
-                return;
-            }
-
-            data.forEach((row, index) => {
-                const motor = escapeHtml(upper(row[0]) || "-");
-                const mesin = escapeHtml(upper(row[1]) || "-");
-                const subMesin = escapeHtml(upper(row[2]) || "-");
-
-                const tanggal = escapeHtml(row[3] || "-");
-                const personil = escapeHtml(upper(row[4]) || "-");
-
-                const ket = upper(row[5] || "BERKALA");
-                const periodeVal = escapeHtml(row[6] || "180");
-                const tanggalSelanjutnya = escapeHtml(row[7] || "-");
-
-                const badgeClass =
-                    ket === "PERBAIKAN"
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-emerald-100 text-emerald-800";
-
-                const tr = document.createElement("tr");
-
-                tr.className = "hover:bg-slate-50 transition";
-
-                tr.innerHTML = `
-                    <td class="py-3 px-4 text-center font-medium text-slate-500">
-                        ${index + 1}
-                    </td>
-
-                    <td class="py-3 px-4 font-semibold text-slate-700">
-                        ${motor}
-                    </td>
-
-                    <td class="py-3 px-4">
-                        <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-semibold">
-                            ${mesin}
-                        </span>
-                    </td>
-
-                    <td class="py-3 px-4">
-                        <span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-xs font-semibold">
-                            ${subMesin}
-                        </span>
-                    </td>
-
-                    <td class="py-3 px-4 text-slate-600">
-                        ${tanggal}
-                    </td>
-
-                    <td class="py-3 px-4 text-slate-600">
-                        ${personil}
-                    </td>
-
-                    <td class="py-3 px-4">
-                        <span class="${badgeClass} px-2.5 py-1 rounded-full text-xs font-bold">
-                            ${escapeHtml(ket)}
-                        </span>
-                    </td>
-
-                    <td class="py-3 px-4 text-center">
-                        <span class="bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded text-xs">
-                            ${periodeVal} HARI
-                        </span>
-                    </td>
-
-                    <td class="py-3 px-4 font-medium text-emerald-600">
-                        ${tanggalSelanjutnya}
-                    </td>
-
-                    <td class="py-3 px-4 text-center space-x-1">
-                        <button onclick="openEditModal(${index})"
-                                class="bg-amber-400 hover:bg-amber-500 text-white px-2.5 py-1 rounded text-xs shadow-sm transition">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-
-                        <button onclick="openDeleteModal(${index})"
-                                class="bg-rose-500 hover:bg-rose-600 text-white px-2.5 py-1 rounded text-xs shadow-sm transition">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-
-                tbody.appendChild(tr);
-            });
-        }
-
-
-        window.onload = loadData;
-
-
-        // ====================================================
-        // 5. SORTING TANGGAL
-        // ====================================================
-
-        function parseLocalDate(dateValue) {
-            const parts = parseDateParts(dateValue);
-
-            if (!parts) {
-                return 0;
-            }
-
-            return new Date(
-                parts.year,
-                parts.month - 1,
-                parts.day
-            ).getTime();
-        }
-
-
-        function toggleSortDate() {
-            sortAscending = !sortAscending;
-
-            const sortIcon = document.getElementById("sortIcon");
-
-            sortIcon.className = sortAscending
-                ? "fa-solid fa-sort-up ml-1 text-sky-400"
-                : "fa-solid fa-sort-down ml-1 text-sky-400";
-
-            globalData.sort((a, b) => {
-                const dateA = parseLocalDate(a[7]);
-                const dateB = parseLocalDate(b[7]);
-
-                return sortAscending
-                    ? dateA - dateB
-                    : dateB - dateA;
-            });
-
-            renderTable(globalData);
-        }
-
-
-        // ====================================================
-        // 6. PENCARIAN
-        // ====================================================
-
-        function filterTable() {
-            const input = upper(
+            const search = normalizeText(
                 document.getElementById("searchInput").value
             );
 
-            const filtered = globalData.filter(row => {
-                return row.some(cell => upper(cell).includes(input));
+
+            // Ambil seluruh ringkasan pada mesin terpilih.
+
+            const machineSummary = buildMachineSummary(selectedMachine);
+
+
+            // Pencarian hanya memengaruhi tabel.
+            // Statistik tetap menggunakan seluruh data mesin.
+
+            const data = machineSummary.filter(item => {
+
+                return !search ||
+                    normalizeText(
+                        item.namaMotor + " " + item.subMesin
+                    ).includes(search);
+
             });
 
-            renderTable(filtered);
-        }
 
-
-        // ====================================================
-        // 7. MODAL DAN NOTIFIKASI
-        // ====================================================
-
-        function showModal(
-            title,
-            messageHtml,
-            iconClass,
-            onConfirmCallback,
-            showFooter = true,
-            confirmBtnText = "Ya, Lanjutkan",
-            confirmBtnClass = "bg-pmpAccent hover:bg-pmpHover"
-        ) {
-            document.getElementById("modalTitle").innerHTML = `
-                <i class="${iconClass} text-sky-400 mr-2"></i>
-                ${escapeHtml(title)}
-            `;
-
-            document.getElementById("modalBody").innerHTML = messageHtml;
-
-            document.getElementById("modalFooter").style.display =
-                showFooter ? "flex" : "none";
-
-            const confirmBtn =
-                document.getElementById("modalConfirmBtn");
-
-            confirmBtn.innerText = confirmBtnText;
-
-            confirmBtn.className =
-                `px-4 py-2 ${confirmBtnClass} text-white font-medium rounded-lg text-sm transition shadow-sm`;
-
-            const modal = document.getElementById("customModal");
-            const container = document.getElementById("modalContainer");
-
-            modal.classList.remove("hidden");
-
-            setTimeout(() => {
-                modal.classList.remove("opacity-0");
-                container.classList.remove("scale-95");
-                container.classList.add("scale-100");
-            }, 10);
-
-            const newBtn = confirmBtn.cloneNode(true);
-            confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
-
-            if (showFooter && onConfirmCallback) {
-                newBtn.addEventListener("click", () => {
-                    onConfirmCallback();
-                });
-            }
-        }
-
-
-        function closeModal() {
-            const modal = document.getElementById("customModal");
-            const container = document.getElementById("modalContainer");
-
-            modal.classList.add("opacity-0");
-
-            container.classList.remove("scale-100");
-            container.classList.add("scale-95");
-
-            setTimeout(() => {
-                modal.classList.add("hidden");
-            }, 300);
-        }
-
-
-        function showNotification(title, message, isSuccess = true) {
-            const icon = isSuccess
-                ? "fa-solid fa-circle-check text-emerald-500"
-                : "fa-solid fa-circle-exclamation text-rose-500";
-
-            const html = `
-                <div class="text-center py-3">
-                    <i class="${icon} text-4xl mb-3"></i>
-
-                    <p class="text-slate-800 font-semibold text-base">
-                        ${escapeHtml(message)}
-                    </p>
-                </div>
-            `;
-
-            showModal(
-                title,
-                html,
-                isSuccess
-                    ? "fa-solid fa-check"
-                    : "fa-solid fa-triangle-exclamation",
-                () => closeModal(),
-                true,
-                "Tutup",
-                isSuccess
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-rose-600 hover:bg-rose-700"
+            const totalReplacements = machineSummary.reduce(
+                (sum, item) => sum + item.diganti,
+                0
             );
-        }
 
 
-        // ====================================================
-        // 8. SIMPAN KE DATABASE
-        // ====================================================
-
-        function triggerSaveDatabaseModal() {
-            const messageHtml = `
-                <div class="text-center py-2">
-                    <i class="fa-solid fa-database text-emerald-500 text-4xl mb-3"></i>
-
-                    <p class="text-slate-700 font-medium">
-                        Simpan data motor yang belum ada di database ke sheet bulanan
-                        (<b>MMM-YY</b>)?
-                    </p>
-
-                    <p class="text-xs text-slate-500 mt-2">
-                        Sistem akan memeriksa seluruh database terlebih dahulu.
-                        Data yang sudah tersimpan akan dilewati, sedangkan hanya data
-                        baru yang akan dimasukkan.
-                    </p>
-                </div>
-            `;
-
-            showModal(
-                "Konfirmasi Simpan Database",
-                messageHtml,
-                "fa-solid fa-floppy-disk",
-                () => {
-                    submitToServer(
-                        { action: "save_to_database" },
-                        "Data berhasil disimpan ke sheet bulanan!"
-                    );
-                },
-                true,
-                "Ya, Simpan",
-                "bg-emerald-600 hover:bg-emerald-700"
-            );
-        }
+            document.getElementById("totalMotors").textContent =
+                machineSummary.length.toLocaleString("id-ID");
 
 
-        // ====================================================
-        // 9. TAMBAH DATA
-        // ====================================================
-
-        function openAddModal() {
-            const today = todayLocalInput();
-
-            const htmlForm = `
-                <div class="space-y-4">
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MOTOR
-                        </label>
-
-                        <input type="text"
-                               id="inputMotor"
-                               placeholder="Masukkan nama motor..."
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MESIN
-                        </label>
-
-                        <input type="text"
-                               id="inputMesin"
-                               placeholder="Contoh: FS 8"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            SUB MESIN
-                        </label>
-
-                        <input type="text"
-                               id="inputSubMesin"
-                               placeholder="Contoh: STACKING / DESTACKING"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            TANGGAL PENGGANTIAN
-                        </label>
-
-                        <input type="date"
-                               id="inputTanggal"
-                               value="${today}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERIODE (HARI)
-                        </label>
-
-                        <input type="number"
-                               id="inputPeriode"
-                               min="1"
-                               step="1"
-                               value="180"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERSONIL
-                        </label>
-
-                        <input type="text"
-                               id="inputPersonil"
-                               placeholder="Nama personil..."
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            JENIS PEKERJAAN (KETERANGAN)
-                        </label>
-
-                        <select id="inputKeterangan"
-                                class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500 bg-white">
-                            <option value="BERKALA">BERKALA</option>
-                            <option value="PERBAIKAN">PERBAIKAN</option>
-                        </select>
-                    </div>
-
-                </div>
-            `;
-
-            showModal(
-                "Tambah Data Baru",
-                htmlForm,
-                "fa-solid fa-plus-circle",
-                () => {
-                    const motor = upper(
-                        document.getElementById("inputMotor").value
-                    );
-
-                    const mesin = upper(
-                        document.getElementById("inputMesin").value
-                    );
-
-                    const subMesin = upper(
-                        document.getElementById("inputSubMesin").value
-                    );
-
-                    const tglInput =
-                        document.getElementById("inputTanggal").value;
-
-                    const periodeVal = getValidPeriod(
-                        document.getElementById("inputPeriode").value
-                    );
-
-                    const personil = upper(
-                        document.getElementById("inputPersonil").value
-                    );
-
-                    const ket = upper(
-                        document.getElementById("inputKeterangan").value
-                    );
-
-                    if (!motor || !mesin || !tglInput || !personil) {
-                        showNotification(
-                            "Peringatan",
-                            "Harap isi nama motor, nama mesin, tanggal, dan personil!",
-                            false
-                        );
-                        return;
-                    }
-
-                    if (!periodeVal) {
-                        showNotification(
-                            "Periode Tidak Valid",
-                            "Periode harus berupa bilangan bulat lebih dari 0.",
-                            false
-                        );
-                        return;
-                    }
-
-                    const tglTerakhir = formatDateFromInput(tglInput);
-                    const tglSelanjutnya = calculateNextDate(
-                        tglInput,
-                        periodeVal
-                    );
-
-                    if (!tglTerakhir || !tglSelanjutnya) {
-                        showNotification(
-                            "Tanggal Tidak Valid",
-                            "Tanggal penggantian atau hasil perhitungan tanggal berikutnya tidak valid.",
-                            false
-                        );
-                        return;
-                    }
-
-                    const newData = [
-                        motor,
-                        mesin,
-                        subMesin,
-                        tglTerakhir,
-                        personil,
-                        ket,
-                        String(periodeVal),
-                        tglSelanjutnya
-                    ];
-
-                    submitToServer(
-                        {
-                            action: "add",
-                            data: newData
-                        },
-                        "Data berhasil ditambahkan!"
-                    );
-                },
-                true,
-                "Simpan Data",
-                "bg-pmpAccent hover:bg-pmpHover"
-            );
-        }
+            document.getElementById("totalReplacements").textContent =
+                totalReplacements.toLocaleString("id-ID");
 
 
-        // ====================================================
-        // 10. EDIT DATA
-        // ====================================================
+            document.getElementById("recordCount").textContent =
+                data.length.toLocaleString("id-ID") +
+                " dari " +
+                machineSummary.length.toLocaleString("id-ID") +
+                " jenis motor ditampilkan";
 
-        function openEditModal(index) {
-            const row = globalData[index];
 
-            if (!row) return;
+            // DATABASE KOSONG
 
-            const formattedDate = formatDateForInput(row[3]);
+            if (!allHistoryData.length) {
 
-            const currentPeriode = row[6] || "180";
-            const currentKet = upper(row[5] || "BERKALA");
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="10"
+                            class="text-center py-10 text-slate-400">
 
-            if (!formattedDate) {
-                showNotification(
-                    "Tanggal Tidak Valid",
-                    "Tanggal penggantian terakhir pada data ini tidak valid. Periksa data di spreadsheet terlebih dahulu.",
-                    false
-                );
+                            Database belum memiliki riwayat penggantian motor.
+
+                        </td>
+                    </tr>
+                `;
+
                 return;
+
             }
 
-            const htmlForm = `
-                <div class="space-y-4">
 
-                    <input type="hidden" id="editIndex" value="${index}">
+            // TIDAK ADA DATA MESIN
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MOTOR
-                        </label>
+            if (!data.length) {
 
-                        <input type="text"
-                               id="editMotor"
-                               value="${escapeHtml(row[0] || "")}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="10"
+                            class="text-center py-10 text-slate-400">
+
+                            <i class="fa-solid fa-inbox text-2xl mb-2"></i>
+
+                            <br>
+
+                            Tidak ada data motor untuk
+                            ${escapeHtml(selectedMachine)}
+                            ${search ? " yang cocok dengan pencarian." : "."}
+
+                        </td>
+                    </tr>
+                `;
+
+                return;
+
+            }
+
+
+            // RENDER BARIS
+
+            tbody.innerHTML = data.map((item, index) => {
+
+                const type = item.keterangan;
+
+                const typeClass =
+                    type === "PERBAIKAN"
+                        ? "type-perbaikan"
+                        : "type-berkala";
+
+
+                const condition = item.condition;
+
+
+                // Rincian MTBF, MTTR, MTBR.
+
+                const analysisHtml = `
+
+                    <div class="flex flex-col gap-1 min-w-[175px]">
+
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-500">MTBF:</span>
+
+                            <span class="text-slate-700">
+                                ${escapeHtml(formatMetric(item.mtbf, "hari"))}
+                            </span>
+                        </div>
+
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-500">MTTR:</span>
+
+                            <span class="text-slate-700">
+                                ${escapeHtml(formatMetric(item.mttr, "jam"))}
+                            </span>
+                        </div>
+
+                        <div class="text-xs">
+                            <span class="font-bold text-slate-500">MTBR:</span>
+
+                            <span class="text-slate-700">
+                                ${escapeHtml(formatMetric(item.mtbr, "hari"))}
+                            </span>
+                        </div>
+
                     </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            NAMA MESIN
-                        </label>
+                `;
 
-                        <input type="text"
-                               id="editMesin"
-                               value="${escapeHtml(row[1] || "")}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            SUB MESIN
-                        </label>
+                return `
 
-                        <input type="text"
-                               id="editSubMesin"
-                               value="${escapeHtml(row[2] || "")}"
-                               placeholder="STACKING / DESTACKING"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
+                    <tr class="record-row transition">
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            TANGGAL PENGGANTIAN TERAKHIR
-                            <span class="text-xs text-slate-400 font-normal">(Tetap)</span>
-                        </label>
+                        <td class="py-3 px-4 text-center text-slate-400">
+                            ${index + 1}
+                        </td>
 
-                        <input type="date"
-                               id="editTanggal"
-                               value="${formattedDate}"
-                               class="w-full px-3 py-2 border rounded-md text-sm bg-slate-100 text-slate-500 cursor-not-allowed"
-                               disabled>
-                    </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERIODE (HARI)
-                        </label>
+                        <td class="py-3 px-4 w-[220px] min-w-[180px] max-w-[220px]">
+                            <div class="font-bold text-slate-700 whitespace-normal break-words leading-snug">
+                                ${escapeHtml(item.namaMotor)}
+                            </div>
+                        </td>
 
-                        <input type="number"
-                               id="editPeriode"
-                               min="1"
-                               step="1"
-                               value="${escapeHtml(currentPeriode)}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            PERSONIL
-                        </label>
+                        <td class="py-3 px-4">
 
-                        <input type="text"
-                               id="editPersonil"
-                               value="${escapeHtml(row[4] || "")}"
-                               class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500">
-                    </div>
+                            <span class="sub-chip">
+                                ${escapeHtml(item.subMesin)}
+                            </span>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1">
-                            JENIS PEKERJAAN (KETERANGAN)
-                        </label>
+                        </td>
 
-                        <select id="editKeterangan"
-                                class="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:border-sky-500 bg-white">
 
-                            <option value="BERKALA"
-                                ${currentKet === "BERKALA" ? "selected" : ""}>
-                                BERKALA
-                            </option>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            ${escapeHtml(formatDate(item.tglPenggantian))}
+                        </td>
 
-                            <option value="PERBAIKAN"
-                                ${currentKet === "PERBAIKAN" ? "selected" : ""}>
-                                PERBAIKAN
-                            </option>
 
-                        </select>
-                    </div>
+                        <td class="py-3 px-4">
 
-                </div>
-            `;
+                            <span class="type-chip ${typeClass}">
+                                ${type}
+                            </span>
 
-            showModal(
-                "Edit Data Pekerjaan",
-                htmlForm,
-                "fa-solid fa-pen-to-square",
-                () => {
-                    const idx =
-                        document.getElementById("editIndex").value;
+                        </td>
 
-                    const motor = upper(
-                        document.getElementById("editMotor").value
-                    );
 
-                    const mesin = upper(
-                        document.getElementById("editMesin").value
-                    );
+                        <td class="py-3 px-4 text-center">
 
-                    const subMesin = upper(
-                        document.getElementById("editSubMesin").value
-                    );
+                            <span class="inline-flex min-w-9 justify-center rounded-full bg-sky-50 text-sky-700 font-bold px-2.5 py-1">
+                                ${item.diganti}x
+                            </span>
 
-                    const tglInputBase =
-                        document.getElementById("editTanggal").value;
+                        </td>
 
-                    const tglTerakhir = formatDateFromInput(tglInputBase);
 
-                    const periodeVal = getValidPeriod(
-                        document.getElementById("editPeriode").value
-                    );
+                        <td class="py-3 px-4 text-center whitespace-nowrap">
 
-                    const personil = upper(
-                        document.getElementById("editPersonil").value
-                    );
+                            ${escapeHtml(item.periode)}
 
-                    const ket = upper(
-                        document.getElementById("editKeterangan").value
-                    );
+                            <span class="text-xs text-slate-400">
+                                hari
+                            </span>
 
-                    if (!motor || !mesin || !personil) {
-                        showNotification(
-                            "Peringatan",
-                            "Nama motor, nama mesin, dan personil wajib diisi!",
-                            false
-                        );
-                        return;
-                    }
+                        </td>
 
-                    if (!periodeVal) {
-                        showNotification(
-                            "Periode Tidak Valid",
-                            "Periode harus berupa bilangan bulat lebih dari 0.",
-                            false
-                        );
-                        return;
-                    }
 
-                    if (!tglTerakhir) {
-                        showNotification(
-                            "Tanggal Tidak Valid",
-                            "Tanggal penggantian terakhir tidak valid.",
-                            false
-                        );
-                        return;
-                    }
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            ${escapeHtml(formatDate(item.tglSelanjutnya))}
+                        </td>
 
-                    const tglSelanjutnya = calculateNextDate(
-                        tglInputBase,
-                        periodeVal
-                    );
 
-                    if (!tglSelanjutnya) {
-                        showNotification(
-                            "Tanggal Tidak Valid",
-                            "Gagal menghitung tanggal penggantian selanjutnya. Periksa tanggal dan periode.",
-                            false
-                        );
-                        return;
-                    }
+                        <!-- ANALISA MTBF MTTR MTBR -->
 
-                    const updatedData = [
-                        motor,
-                        mesin,
-                        subMesin,
-                        tglTerakhir,
-                        personil,
-                        ket,
-                        String(periodeVal),
-                        tglSelanjutnya
-                    ];
+                        <td class="py-3 px-4">
+                            ${analysisHtml}
+                        </td>
 
-                    submitToServer(
-                        {
-                            action: "edit",
-                            index: parseInt(idx, 10) + 1,
-                            data: updatedData
-                        },
-                        "Data berhasil diperbarui!"
-                    );
-                },
-                true,
-                "Simpan Perubahan",
-                "bg-pmpAccent hover:bg-pmpHover"
-            );
+
+                        <!-- STATUS MOTOR -->
+
+                        <td class="py-3 px-4 text-center">
+
+                            <span class="analysis-chip ${condition.css}">
+
+                                <i class="fa-solid ${condition.icon}"></i>
+
+                                ${condition.label}
+
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                `;
+
+            }).join("");
+
         }
 
 
-        // ====================================================
-        // 11. HAPUS DATA
-        // ====================================================
+        // =========================================================
+        // 12. MEMUAT DATA GOOGLE SHEETS
+        // =========================================================
 
-        function openDeleteModal(index) {
-            const row = globalData[index];
+        async function loadHistoryData(showMessage) {
 
-            if (!row) return;
+            if (isLoading) return;
 
-            const messageHtml = `
-                <div class="text-center py-2">
+            isLoading = true;
 
-                    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-4xl mb-3"></i>
 
-                    <p class="text-slate-700 font-medium">
-                        Apakah Anda yakin ingin menghapus data motor:
-                    </p>
+            const button =
+                document.getElementById("refreshButton");
 
-                    <p class="text-slate-900 font-bold mt-1">
-                        "${escapeHtml(row[0])}"
-                        (${escapeHtml(row[1])})
-                        - ${escapeHtml(row[2] || "-")}
-                    </p>
 
-                    <p class="text-xs text-slate-400 mt-2">
-                        Tindakan ini tidak dapat dibatalkan.
-                    </p>
+            button.disabled = true;
 
-                </div>
+            button.innerHTML =
+                '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Memuat...';
+
+
+            document.getElementById("tableBody").innerHTML = `
+
+                <tr>
+
+                    <td colspan="10"
+                        class="text-center py-10 text-slate-400">
+
+                        <i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i>
+
+                        <br>
+
+                        Mengambil data dari Google Sheets...
+
+                    </td>
+
+                </tr>
+
             `;
 
-            showModal(
-                "Konfirmasi Hapus Data",
-                messageHtml,
-                "fa-solid fa-trash-can",
-                () => {
-                    submitToServer(
-                        {
-                            action: "delete",
-                            index: index + 1
-                        },
-                        "Data berhasil dihapus!"
-                    );
-                },
-                true,
-                "Ya, Hapus",
-                "bg-rose-500 hover:bg-rose-600"
-            );
-        }
-
-
-        // ====================================================
-        // 12. KIRIM DATA KE APPS SCRIPT
-        // ====================================================
-
-        async function submitToServer(payload, successMessage) {
-            showModal(
-                "Sedang Memproses...",
-                `
-                    <div class="flex flex-col items-center py-4">
-                        <i class="fa-solid fa-circle-notch fa-spin text-3xl text-sky-600 mb-3"></i>
-
-                        <p class="text-sm text-slate-600">
-                            Menyimpan perubahan ke server...
-                        </p>
-                    </div>
-                `,
-                "fa-solid fa-sync",
-                null,
-                false
-            );
 
             try {
-                const result = await postToServer(payload);
 
-                closeModal();
+                const response = await fetch(APPS_SCRIPT_URL, {
 
-                const message =
-                    result && typeof result === "object"
-                        ? (result.message || successMessage || "Berhasil.")
-                        : (successMessage || String(result));
+                    method: "POST",
 
-                showNotification(
-                    "Berhasil",
-                    message,
-                    true
-                );
+                    body: JSON.stringify({
+                        action: "get_history_data"
+                    })
 
-                await loadData();
+                });
+
+
+                if (!response.ok) {
+                    throw new Error("HTTP " + response.status);
+                }
+
+
+                const result = await response.json();
+
+
+                if (!Array.isArray(result)) {
+
+                    throw new Error(
+                        result.error ||
+                        result.message ||
+                        "Format data dari server tidak sesuai."
+                    );
+
+                }
+
+
+                allHistoryData = result;
+
+
+                // Perbarui diagram dan tabel.
+
+                updateReplacementChart(selectedMachine);
+
+                renderTable();
+
+
+                document.getElementById("lastUpdated").textContent =
+                    "Diperbarui: " +
+                    new Date().toLocaleString("id-ID");
+
+
+                if (showMessage) {
+                    console.info("Data motor berhasil diperbarui.");
+                }
+
 
             } catch (error) {
-                closeModal();
-
-                showNotification(
-                    "Gagal",
-                    error.message || "Terjadi kesalahan koneksi ke server.",
-                    false
-                );
 
                 console.error(error);
-            }
-        }
 
 
-        // ====================================================
-        // 13. KOMPONEN TAMPILAN PROGRESS SCRAPER
-        // ====================================================
+                document.getElementById("tableBody").innerHTML = `
 
-        function scraperProgressHtml() {
-            return `
-                <div class="space-y-5">
+                    <tr>
 
-                    <div class="text-center">
-                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 text-amber-600 mb-3">
-                            <i class="fa-solid fa-cloud-arrow-down text-2xl"></i>
-                        </div>
+                        <td colspan="10"
+                            class="text-center py-10 text-rose-500">
 
-                        <h4 class="font-bold text-slate-800 text-base">
-                            Proses Pengambilan Data
-                        </h4>
+                            <i class="fa-solid fa-triangle-exclamation text-xl mb-2"></i>
 
-                        <p id="scraperStatusText" class="text-sm text-slate-500 mt-1">
-                            Menghubungkan ke server...
-                        </p>
-                    </div>
+                            <br>
 
+                            Gagal memuat data:
+                            ${escapeHtml(error.message)}
 
-                    <!-- PERSENTASE AKTUAL -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                            <br>
 
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-semibold text-slate-500 uppercase">
-                                Progress Aktual
+                            <span class="text-xs text-slate-400">
+
+                                Pastikan URL Web App dan izin akses Google Apps Script sudah benar.
+
                             </span>
 
-                            <span id="scraperProgressPercent"
-                                  class="text-lg font-bold text-slate-700">
-                                Menunggu
-                            </span>
-                        </div>
+                        </td>
 
-                        <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                    </tr>
 
-                            <div id="scraperProgressBar"
-                                 class="h-full bg-sky-600 rounded-full progress-bar"
-                                 style="width: 0%; display: none;">
-                            </div>
-
-                            <div id="scraperProgressIndeterminate"
-                                 class="h-full bg-sky-500 rounded-full progress-indeterminate"
-                                 style="display: block;">
-                            </div>
-
-                        </div>
-
-                        <p id="scraperProgressMessage"
-                           class="text-xs text-slate-500 mt-3 text-center">
-                            Menunggu laporan progres aktual dari scraper...
-                        </p>
-
-                    </div>
+                `;
 
 
-                    <!-- DETAIL PROSES -->
-                    <div class="space-y-2 text-sm">
+                document.getElementById("totalMotors").textContent = "—";
 
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-500">Status</span>
-                            <span id="scraperStatusLabel"
-                                  class="font-semibold text-amber-600">
-                                MENUNGGU
-                            </span>
-                        </div>
+                document.getElementById("totalReplacements").textContent = "—";
 
-                        <div class="flex justify-between gap-3">
-                            <span class="text-slate-500">Run ID</span>
-                            <span id="scraperRunIdLabel"
-                                  class="font-mono text-xs text-slate-600">
-                                -
-                            </span>
-                        </div>
+                document.getElementById("recordCount").textContent =
+                    "Gagal memuat data";
 
-                    </div>
 
-                    <div id="scraperErrorMessage"
-                         class="hidden bg-rose-50 border border-rose-200 text-rose-700 rounded-lg p-3 text-sm">
-                    </div>
+            } finally {
 
-                    <p class="text-xs text-slate-400 text-center">
-                        Persentase hanya ditampilkan jika server mengirimkan nilai progres aktual.
-                    </p>
+                isLoading = false;
 
-                </div>
-            `;
+                button.disabled = false;
+
+                button.innerHTML =
+                    '<i class="fa-solid fa-rotate-right mr-1"></i> Muat Ulang Data';
+
+            }
+
         }
 
 
-        function updateScraperProgressUI(data) {
-            if (!data || typeof data !== "object") {
-                return;
-            }
+        // =========================================================
+        // 13. INISIALISASI
+        // =========================================================
 
-            const statusText =
-                document.getElementById("scraperStatusText");
+        document.addEventListener("DOMContentLoaded", function() {
 
-            const statusLabel =
-                document.getElementById("scraperStatusLabel");
+            loadHistoryData(false);
 
-            const percentLabel =
-                document.getElementById("scraperProgressPercent");
-
-            const progressBar =
-                document.getElementById("scraperProgressBar");
-
-            const indeterminate =
-                document.getElementById("scraperProgressIndeterminate");
-
-            const progressMessage =
-                document.getElementById("scraperProgressMessage");
-
-            const runIdLabel =
-                document.getElementById("scraperRunIdLabel");
-
-            const errorBox =
-                document.getElementById("scraperErrorMessage");
-
-            if (
-                !statusText ||
-                !statusLabel ||
-                !percentLabel ||
-                !progressBar ||
-                !indeterminate ||
-                !progressMessage
-            ) {
-                return;
-            }
-
-            const status = String(data.status || "running").toLowerCase();
-
-            const message =
-                data.message ||
-                data.detail ||
-                "Menunggu pembaruan proses dari server...";
-
-            statusText.innerText = message;
-            progressMessage.innerText = message;
-
-            if (runIdLabel && data.run_id) {
-                runIdLabel.innerText = String(data.run_id);
-            }
-
-            // Hanya angka progress yang dikirim backend yang ditampilkan.
-            const progressValue = Number(data.progress);
-
-            const hasActualProgress =
-                data.progress !== null &&
-                data.progress !== undefined &&
-                data.progress !== "" &&
-                Number.isFinite(progressValue) &&
-                progressValue >= 0 &&
-                progressValue <= 100;
-
-            if (hasActualProgress) {
-                percentLabel.innerText = `${progressValue}%`;
-
-                progressBar.style.display = "block";
-                indeterminate.style.display = "none";
-
-                progressBar.style.width = `${progressValue}%`;
-            } else {
-                percentLabel.innerText = "Menunggu";
-
-                progressBar.style.display = "none";
-                indeterminate.style.display = "block";
-            }
-
-            const statusMap = {
-                queued: {
-                    label: "ANTRE",
-                    color: "text-amber-600"
-                },
-                pending: {
-                    label: "MENUNGGU",
-                    color: "text-amber-600"
-                },
-                running: {
-                    label: "BERJALAN",
-                    color: "text-sky-600"
-                },
-                success: {
-                    label: "BERHASIL",
-                    color: "text-emerald-600"
-                },
-                completed: {
-                    label: "SELESAI",
-                    color: "text-emerald-600"
-                },
-                failed: {
-                    label: "GAGAL",
-                    color: "text-rose-600"
-                },
-                error: {
-                    label: "ERROR",
-                    color: "text-rose-600"
-                },
-                cancelled: {
-                    label: "DIBATALKAN",
-                    color: "text-slate-600"
-                }
-            };
-
-            const mapped = statusMap[status] || {
-                label: status.toUpperCase(),
-                color: "text-sky-600"
-            };
-
-            statusLabel.innerText = mapped.label;
-            statusLabel.className = `font-semibold ${mapped.color}`;
-
-            if (status === "success" || status === "completed") {
-                if (hasActualProgress) {
-                    progressBar.style.width = `${progressValue}%`;
-                }
-
-                percentLabel.innerText = hasActualProgress
-                    ? `${progressValue}%`
-                    : "Selesai";
-
-                progressBar.style.display = "block";
-                indeterminate.style.display = "none";
-
-                progressBar.classList.remove("bg-sky-600");
-                progressBar.classList.add("bg-emerald-500");
-            }
-
-            if (
-                status === "failed" ||
-                status === "error" ||
-                status === "cancelled"
-            ) {
-                if (data.error && errorBox) {
-                    errorBox.innerText = String(data.error);
-                    errorBox.classList.remove("hidden");
-                }
-
-                progressBar.classList.remove("bg-sky-600");
-                progressBar.classList.add("bg-rose-500");
-            }
-        }
-
-
-        function showScraperProgressModal() {
-            showModal(
-                "Progress Scraper",
-                scraperProgressHtml(),
-                "fa-solid fa-cloud-arrow-down",
-                null,
-                false
-            );
-        }
-
-
-        // ====================================================
-        // 14. POLLING PROGRESS DARI CODE.GS
-        // ====================================================
-
-        function stopScraperPolling() {
-            if (progressPollTimer) {
-                clearTimeout(progressPollTimer);
-                progressPollTimer = null;
-            }
-
-            scraperPollingActive = false;
-        }
-
-
-        async function pollScraperProgress() {
-            if (!scraperPollingActive) {
-                return;
-            }
-
-            try {
-                /*
-                 * Endpoint yang akan dibuat di code.gs:
-                 *
-                 * action: "get_scraper_status"
-                 * run_id: ID proses scraper
-                 *
-                 * Contoh respons:
-                 * {
-                 *   ok: true,
-                 *   status: "running",
-                 *   progress: 42,
-                 *   message: "Memproses data ke-42",
-                 *   run_id: "123456"
-                 * }
-                 */
-
-                const result = await postToServer({
-                    action: "get_scraper_status",
-                    run_id: scraperRunId
-                });
-
-                let data = result;
-
-                if (typeof result === "string") {
-                    data = parseServerResponse(result);
-                }
-
-                if (!data || typeof data !== "object") {
-                    throw new Error(
-                        "Format respons status scraper tidak sesuai."
-                    );
-                }
-
-                updateScraperProgressUI(data);
-
-                const status = String(data.status || "").toLowerCase();
-
-                const isFinished = [
-                    "success",
-                    "completed",
-                    "no_data",
-                    "failed",
-                    "error",
-                    "cancelled"
-                ].includes(status);
-
-                if (isFinished) {
-                    stopScraperPolling();
-
-                    if (status === "success" || status === "completed") {
-                        await loadData();
-
-                        setTimeout(() => {
-                            showNotification(
-                                "Scraper Selesai",
-                                data.message || "Scraper selesai dan data terbaru telah dimuat.",
-                                true
-                            );
-                        }, 350);
-
-                    } else if (status === "no_data") {
-                        setTimeout(() => {
-                            showModal(
-                                "Data Tidak Ditemukan",
-                                `
-                                    <div class="text-center py-3">
-                                        <i class="fa-solid fa-circle-info text-amber-500 text-4xl mb-3"></i>
-                                        <p class="text-slate-800 font-semibold text-base">
-                                            ${escapeHtml(data.message || "Scraper selesai, tetapi tidak menemukan data pada rentang tanggal yang dipilih.")}
-                                        </p>
-                                        <p class="text-sm text-slate-500 mt-2">
-                                            Tekan tombol Tutup untuk memuat ulang halaman.
-                                        </p>
-                                    </div>
-                                `,
-                                "fa-solid fa-circle-info",
-                                () => {
-                                    closeModal();
-                                    setTimeout(() => {
-                                        window.location.reload();
-                                    }, 350);
-                                },
-                                true,
-                                "Tutup",
-                                "bg-amber-500 hover:bg-amber-600"
-                            );
-                        }, 350);
-
-                    } else {
-                        setTimeout(() => {
-                            showNotification(
-                                "Scraper Tidak Berhasil",
-                                data.error || data.message || "Proses scraper gagal.",
-                                false
-                            );
-                        }, 350);
-                    }
-
-                    return;
-                }
-
-            } catch (error) {
-                console.error("Gagal mengambil progress scraper:", error);
-
-                const statusText =
-                    document.getElementById("scraperStatusText");
-
-                const progressMessage =
-                    document.getElementById("scraperProgressMessage");
-
-                if (statusText) {
-                    statusText.innerText =
-                        "Belum dapat membaca status dari server.";
-                }
-
-                if (progressMessage) {
-                    progressMessage.innerText =
-                        "Menunggu koneksi status backend tersedia...";
-                }
-            }
-
-            if (scraperPollingActive) {
-                progressPollTimer = setTimeout(
-                    pollScraperProgress,
-                    PROGRESS_POLL_INTERVAL
-                );
-            }
-        }
-
-
-        function startScraperPolling(runId) {
-            stopScraperPolling();
-
-            scraperRunId = runId || null;
-            scraperPollingActive = true;
-
-            const runIdLabel =
-                document.getElementById("scraperRunIdLabel");
-
-            if (runIdLabel && scraperRunId) {
-                runIdLabel.innerText = String(scraperRunId);
-            }
-
-            pollScraperProgress();
-        }
-
-
-        // ====================================================
-        // 15. TRIGGER SCRAPER
-        // ====================================================
-
-        function triggerScraperModal() {
-            const dateFrom =
-                document.getElementById("dateFrom").value;
-
-            const dateTo =
-                document.getElementById("dateTo").value;
-
-            if (dateFrom && dateTo && dateFrom > dateTo) {
-                showNotification(
-                    "Rentang Tanggal Tidak Valid",
-                    "Tanggal awal tidak boleh lebih besar daripada tanggal akhir.",
-                    false
-                );
-                return;
-            }
-
-            showModal(
-                "Picu Tarik Data Otomatis",
-                `
-                    <div class="text-center py-2">
-
-                        <i class="fa-solid fa-cloud-arrow-down text-amber-500 text-4xl mb-3"></i>
-
-                        <p class="text-slate-700 font-medium">
-                            Sistem akan menjalankan GitHub Actions untuk mengambil data.
-                        </p>
-
-                        <div class="bg-slate-50 rounded-lg p-3 mt-4 text-sm">
-                            <div class="flex justify-between mb-2">
-                                <span class="text-slate-500">Tanggal awal</span>
-                                <b>${escapeHtml(dateFrom || "DEFAULT")}</b>
-                            </div>
-
-                            <div class="flex justify-between">
-                                <span class="text-slate-500">Tanggal akhir</span>
-                                <b>${escapeHtml(dateTo || "DEFAULT")}</b>
-                            </div>
-                        </div>
-
-                        <p class="text-xs text-slate-400 mt-3">
-                            Progress akan mengikuti laporan aktual dari backend.
-                        </p>
-
-                    </div>
-                `,
-                "fa-solid fa-bolt",
-                () => {
-                    runScraper(dateFrom, dateTo);
-                },
-                true,
-                "Mulai Scraper",
-                "bg-amber-500 hover:bg-amber-600"
-            );
-        }
-
-
-        async function runScraper(dateFrom, dateTo) {
-            showScraperProgressModal();
-
-            updateScraperProgressUI({
-                status: "pending",
-                message: "Mengirim permintaan untuk menjalankan scraper..."
-            });
-
-            try {
-                /*
-                 * Endpoint yang sudah ada di code.gs:
-                 * action: "trigger_scraper"
-                 *
-                 * Nantinya sebaiknya mengembalikan JSON:
-                 * {
-                 *   ok: true,
-                 *   status: "queued",
-                 *   run_id: "123456",
-                 *   message: "Scraper berhasil dipicu."
-                 * }
-                 */
-
-                const result = await postToServer({
-                    action: "trigger_scraper",
-                    date_from: dateFrom,
-                    date_to: dateTo
-                });
-
-                let data = result;
-
-                if (typeof result === "string") {
-                    data = parseServerResponse(result);
-                }
-
-                if (data && typeof data === "object") {
-                    if (data.ok === false) {
-                        throw new Error(
-                            data.message || "Gagal menjalankan scraper."
-                        );
-                    }
-
-                    scraperRunId =
-                        data.run_id ||
-                        data.runId ||
-                        data.workflow_run_id ||
-                        null;
-
-                    updateScraperProgressUI({
-                        status: data.status || "queued",
-                        progress: data.progress,
-                        run_id: scraperRunId,
-                        message: data.message || "Scraper berhasil dipicu. Menunggu laporan progres aktual..."
-                    });
-
-                } else {
-                    /*
-                     * Kompatibilitas sementara dengan code.gs lama
-                     * yang mungkin masih mengembalikan teks biasa.
-                     *
-                     * Run ID belum tersedia jika backend belum
-                     * mengembalikannya.
-                     */
-                    updateScraperProgressUI({
-                        status: "queued",
-                        message: String(data || "Permintaan scraper telah dikirim. Menunggu status backend...")
-                    });
-                }
-
-                startScraperPolling(scraperRunId);
-
-            } catch (error) {
-                stopScraperPolling();
-
-                console.error("Gagal memicu scraper:", error);
-
-                updateScraperProgressUI({
-                    status: "failed",
-                    message: error.message || "Gagal memicu scraper.",
-                    error: error.message
-                });
-
-                showNotification(
-                    "Gagal",
-                    error.message || "Gagal memicu scraper.",
-                    false
-                );
-            }
-        }
-
-
-        // ====================================================
-        // 16. INTEGRASI PROGRESS - KONTRAK BACKEND
-        // ====================================================
-
-        /*
-         * NANTI DI CODE.GS:
-         *
-         * 1. trigger_scraper
-         *    - Memulai GitHub Actions.
-         *    - Mengembalikan run_id.
-         *
-         * 2. update_scraper_progress
-         *    - Dipanggil oleh scraper.py setiap ada perubahan progres.
-         *    - Menyimpan status, progress, message, dan run_id.
-         *
-         * 3. get_scraper_status
-         *    - Mengembalikan status terakhir untuk run_id tertentu.
-         *
-         *
-         * NANTI DI SCRAPER.PY:
-         *
-         * Setiap tahapan proses mengirimkan progres aktual ke Apps Script.
-         * Contoh payload:
-         *
-         * {
-         *   "action": "update_scraper_progress",
-         *   "run_id": "123456",
-         *   "status": "running",
-         *   "progress": 35,
-         *   "message": "Mengambil data halaman 2"
-         * }
-         *
-         * Persentase tidak dihitung dari waktu atau animasi.
-         * Nilainya harus berasal dari jumlah pekerjaan yang benar-benar
-         * sudah selesai dibandingkan total pekerjaan yang diketahui.
-         *
-         * Jika backend belum mengirim progress, HTML akan tetap
-         * menampilkan indikator menunggu tanpa angka palsu.
-         */
-
-
-        // ====================================================
-        // 17. INISIALISASI
-        // ====================================================
-
-        window.addEventListener("beforeunload", () => {
-            stopScraperPolling();
         });
 
     </script>
