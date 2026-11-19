@@ -1,4 +1,3 @@
-
 import os
 import re
 import time
@@ -149,24 +148,37 @@ def update_progress(
 # 3. RENTANG TANGGAL
 # ============================================================
 
+
 def get_date_range():
 
     date_from_env = os.getenv("INPUT_DATE_FROM", "").strip()
     date_to_env = os.getenv("INPUT_DATE_TO", "").strip()
 
+    print("\n========================================")
+    print("PEMERIKSAAN INPUT TANGGAL GITHUB ACTIONS")
+    print("========================================")
+    print(f"INPUT_DATE_FROM diterima : {date_from_env!r}")
+    print(f"INPUT_DATE_TO diterima   : {date_to_env!r}")
+
     if date_from_env and date_to_env:
 
-        date_from = datetime.strptime(
-            date_from_env, "%Y-%m-%d"
-        ).date()
+        try:
+            date_from = datetime.strptime(
+                date_from_env, "%Y-%m-%d"
+            ).date()
 
-        date_to = datetime.strptime(
-            date_to_env, "%Y-%m-%d"
-        ).date()
+            date_to = datetime.strptime(
+                date_to_env, "%Y-%m-%d"
+            ).date()
+
+        except ValueError:
+            raise ValueError(
+                "Format tanggal tidak valid. Gunakan YYYY-MM-DD."
+            )
 
         print(
-            f"=== TANGGAL KUSTOM: "
-            f"{date_from} s/d {date_to} ==="
+            f"MODE SCRAPING: TANGGAL PILIHAN "
+            f"{date_from} s/d {date_to}"
         )
 
     elif not date_from_env and not date_to_env:
@@ -175,24 +187,25 @@ def get_date_range():
         date_from = date_to - timedelta(days=29)
 
         print(
-            f"=== DEFAULT 30 HARI: "
-            f"{date_from} s/d {date_to} ==="
+            f"MODE SCRAPING: DEFAULT 30 HARI "
+            f"{date_from} s/d {date_to}"
         )
 
     else:
 
         raise ValueError(
-            "Tanggal mulai dan tanggal selesai harus diisi bersamaan."
+            "Hanya satu tanggal yang diterima. "
+            "Tanggal mulai dan selesai harus diisi bersamaan."
         )
 
     if date_from > date_to:
-
         raise ValueError(
             "Tanggal mulai tidak boleh lebih besar dari tanggal selesai."
         )
 
-    return date_from, date_to
+    print("========================================\n")
 
+    return date_from, date_to
 
 # ============================================================
 # 4. KONVERSI TANGGAL
