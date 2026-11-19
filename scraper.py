@@ -1687,18 +1687,18 @@ def send_to_google_sheets(all_data):
 
     if not all_data:
 
-    print(
-        "Tidak ada data dari kedua sumber."
-    )
+        print(
+            "Tidak ada data dari kedua sumber."
+        )
 
-    print(
-        "Mengirim data kosong untuk membersihkan Sheet1."
-    )
+        print(
+            "Mengirim data kosong untuk membersihkan Sheet1."
+        )
 
-    update_progress(
-        85,
-        "Tidak ada data. Membersihkan Sheet1."
-    )
+        update_progress(
+            85,
+            "Tidak ada data. Membersihkan Sheet1."
+        )
 
     print(
         f"Total data gabungan: {len(all_data)}"
