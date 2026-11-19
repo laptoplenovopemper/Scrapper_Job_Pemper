@@ -1806,6 +1806,7 @@ def run_scraper():
             date_to
         )
 
+        
         # ----------------------------------------------------
         # GABUNGKAN
         # ----------------------------------------------------
@@ -1851,6 +1852,32 @@ def run_scraper():
                 "Periksa log login, tabel, header, dan filter tanggal."
             )
 
+        # ----------------------------------------------------
+        # PERIKSA JIKA TIDAK ADA DATA
+        # ----------------------------------------------------
+
+        if not combined_data:
+
+            print("\n")
+            print("=" * 60)
+            print("TIDAK ADA PENGGANTIAN MOTOR")
+            print("=" * 60)
+
+            print(
+                f"Tidak ditemukan data pada rentang "
+                f"{date_from} sampai {date_to}."
+            )
+
+            update_progress(
+                100,
+                (
+                    f"Tidak ditemukan data Penggantian Motor "
+                    f"pada tanggal {date_from} sampai {date_to}."
+                ),
+                status="no_data"
+            )
+
+            return
         # ----------------------------------------------------
         # KIRIM DATA
         # ----------------------------------------------------
