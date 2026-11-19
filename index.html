@@ -119,6 +119,83 @@
                 flex: 1 1 calc(25% - 8px);
             }
         }
+    
+
+        .replacement-date-list {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+            min-width: 150px;
+        }
+
+        .replacement-date-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 8px;
+            border: 1px solid #bfdbfe;
+            border-radius: 7px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+
+        .replacement-date-chip:hover {
+            background: #dbeafe;
+            border-color: #60a5fa;
+            transform: translateY(-1px);
+        }
+
+        .replacement-date-chip:focus {
+            outline: 2px solid #0284c7;
+            outline-offset: 2px;
+        }
+
+        .pareto-scroll { overflow-x: auto; }
+        .pareto-scroll svg { display: block; width: 100%; min-width: 650px; height: auto; }
+
+        .pareto-track {
+            height: 12px;
+            min-width: 75px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: #e2e8f0;
+        }
+
+        .pareto-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: #0ea5e9;
+        }
+
+        .detail-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: rgba(15, 23, 42, .6);
+        }
+
+        .detail-modal-backdrop.show { display: flex; }
+
+        .detail-modal-panel {
+            width: 100%;
+            max-width: 650px;
+            max-height: 85vh;
+            overflow-y: auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,.25);
+        }
+
     </style>
 </head>
 
@@ -489,12 +566,92 @@
         </section>
 
 
+
+
+        <!-- =========================================================
+             ANALISIS PARETO PENGGANTIAN MOTOR PER SUB MESIN
+             ========================================================= -->
+        <section class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 mt-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+                <div>
+                    <h3 class="font-bold text-sm text-slate-800">
+                        <i class="fa-solid fa-chart-column text-sky-600 mr-1"></i>
+                        Pareto Penggantian Motor per Sub Mesin
+                    </h3>
+                    <p id="paretoDescription" class="text-xs text-slate-500 mt-1">
+                        Distribusi jumlah penggantian motor pada kelompok FS1.
+                    </p>
+                </div>
+                <span id="paretoTotal" class="text-xs font-bold rounded-full bg-sky-50 text-sky-700 px-3 py-1.5">
+                    0 penggantian
+                </span>
+            </div>
+
+            <div id="paretoEmpty" class="hidden py-8 text-center text-sm text-slate-400">
+                Belum ada data penggantian untuk ditampilkan.
+            </div>
+            <div id="paretoChartWrap" class="pareto-scroll">
+                <div id="paretoChart"></div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-4 text-xs text-slate-500 mt-3">
+                <span class="inline-flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-sm bg-sky-500"></span>
+                    Jumlah penggantian
+                </span>
+                <span class="inline-flex items-center gap-2">
+                    <span class="w-5 h-0.5 bg-rose-500"></span>
+                    Persentase kumulatif
+                </span>
+            </div>
+
+            <div class="overflow-x-auto mt-5">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-slate-800 text-white text-xs uppercase">
+                            <th class="px-3 py-3 text-center">No.</th>
+                            <th class="px-3 py-3 text-left">Sub Mesin</th>
+                            <th class="px-3 py-3 text-right">Jumlah Penggantian</th>
+                            <th class="px-3 py-3 text-left min-w-40">Kontribusi</th>
+                            <th class="px-3 py-3 text-right">Kumulatif</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paretoTableBody" class="divide-y divide-slate-200">
+                        <tr><td colspan="5" class="py-5 text-center text-slate-400">Memuat analisis...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-xs text-slate-400 mt-3">
+                Pareto dihitung dari jumlah catatan penggantian pada masing-masing sub mesin di kelompok FS yang sedang dipilih.
+            </p>
+        </section>
+
+
         <p class="text-xs text-slate-400 mt-4">
             <i class="fa-solid fa-circle-info mr-1"></i>
             Jumlah penggantian dihitung dari seluruh catatan pada database untuk kombinasi nama motor dan sub mesin dalam kelompok mesin yang sama.
         </p>
 
     </main>
+
+
+    
+
+    <!-- MODAL DETAIL TANGGAL PENGGANTIAN -->
+    <div id="replacementDetailModal" class="detail-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="replacementDetailTitle">
+        <div class="detail-modal-panel">
+            <div class="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-4 bg-white border-b border-slate-200 rounded-t-xl">
+                <div>
+                    <h2 id="replacementDetailTitle" class="font-bold text-slate-800">Detail Penggantian Motor</h2>
+                    <p id="replacementDetailSubtitle" class="text-xs text-slate-500 mt-1"></p>
+                </div>
+                <button type="button" onclick="closeReplacementDetail()" class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600" aria-label="Tutup detail">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="replacementDetailContent" class="p-5"></div>
+        </div>
+    </div>
 
 
     <script>
@@ -627,8 +784,9 @@
             }
 
 
+            // Format ISO dari Google Sheets, termasuk timestamp dengan jam.
             match = text.match(
-                /^(\d{4})-(\d{1,2})-(\d{1,2})/
+                /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/
             );
 
             if (match) {
@@ -677,6 +835,159 @@
                 "-" +
                 String(date.getFullYear()).slice(-2);
 
+        }
+
+
+
+        // =========================================================
+        // 3A. RIWAYAT TANGGAL PENGGANTIAN & DETAIL MOTOR
+        // =========================================================
+
+        function formatDateDDMMYY(value) {
+            const date = parseDate(value);
+            if (!date) return value ? String(value) : "—";
+
+            return String(date.getDate()).padStart(2, "0") +
+                String(date.getMonth() + 1).padStart(2, "0") +
+                String(date.getFullYear()).slice(-2);
+        }
+
+
+        function getMotorReplacementRecords(summary) {
+            const key = makeGroupKey({
+                namaMotor: summary.namaMotor,
+                subMesin: summary.subMesin
+            });
+
+            return allHistoryData.filter(item =>
+                normalizeMachine(item.namaMesin) === selectedMachine &&
+                makeGroupKey(item) === key
+            );
+        }
+
+
+        function getMotorReplacementDates(summary) {
+            const records = getMotorReplacementRecords(summary);
+            const dateMap = new Map();
+
+            records.forEach(record => {
+                const date = parseDate(record.tglPenggantian);
+                if (!date) return;
+
+                const key = date.getFullYear() + "-" +
+                    String(date.getMonth() + 1).padStart(2, "0") + "-" +
+                    String(date.getDate()).padStart(2, "0");
+
+                if (!dateMap.has(key)) {
+                    dateMap.set(key, {
+                        key: key,
+                        timestamp: date.getTime(),
+                        label: formatDateDDMMYY(record.tglPenggantian)
+                    });
+                }
+            });
+
+            return Array.from(dateMap.values())
+                .sort((a, b) => a.timestamp - b.timestamp);
+        }
+
+
+        function openReplacementDetail(motorName, subMachine, dateKey) {
+            const motorKey = makeGroupKey({
+                namaMotor: motorName,
+                subMesin: subMachine
+            });
+
+            const records = allHistoryData.filter(item => {
+                if (normalizeMachine(item.namaMesin) !== selectedMachine) return false;
+                if (makeGroupKey(item) !== motorKey) return false;
+
+                const date = parseDate(item.tglPenggantian);
+                if (!date) return false;
+
+                const key = date.getFullYear() + "-" +
+                    String(date.getMonth() + 1).padStart(2, "0") + "-" +
+                    String(date.getDate()).padStart(2, "0");
+
+                return key === dateKey;
+            });
+
+            if (!records.length) return;
+
+            const date = parseDate(records[0].tglPenggantian);
+            const displayDate = formatDateDDMMYY(records[0].tglPenggantian);
+
+            document.getElementById("replacementDetailSubtitle").textContent =
+                selectedMachine + " • " + displayDate;
+
+            document.getElementById("replacementDetailContent").innerHTML = `
+                <div class="rounded-lg border border-sky-100 bg-sky-50 p-4 mb-4">
+                    <p class="text-[11px] font-bold tracking-wide text-sky-600">NAMA MOTOR</p>
+                    <p class="font-bold text-slate-800 mt-1">${escapeHtml(motorName)}</p>
+                    <div class="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                            <p class="text-[11px] text-slate-500">Kelompok Mesin</p>
+                            <p class="text-sm font-semibold text-slate-700">${escapeHtml(selectedMachine)}</p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] text-slate-500">Sub Mesin</p>
+                            <p class="text-sm font-semibold text-slate-700">${escapeHtml(subMachine)}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <p class="text-[11px] text-slate-500">Tanggal Penggantian</p>
+                        <p class="text-xl font-bold text-sky-700">${escapeHtml(displayDate)}</p>
+                    </div>
+                </div>
+
+                <h3 class="text-sm font-bold text-slate-700 mb-2">
+                    Catatan penggantian (${records.length})
+                </h3>
+                <div class="space-y-3">
+                    ${records.map((record, index) => {
+                        const type = normalizeType(record.keterangan);
+                        const typeClass = type === "PERBAIKAN"
+                            ? "type-perbaikan"
+                            : "type-berkala";
+
+                        return `
+                            <div class="border border-slate-200 rounded-lg p-3">
+                                <div class="flex items-center justify-between gap-2 mb-3">
+                                    <span class="text-sm font-bold text-slate-700">Catatan ${index + 1}</span>
+                                    <span class="type-chip ${typeClass}">${type}</span>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <p class="text-[11px] text-slate-400">Tanggal Penggantian</p>
+                                        <p class="font-semibold text-slate-700">${escapeHtml(formatDate(record.tglPenggantian))}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] text-slate-400">Periode</p>
+                                        <p class="font-semibold text-slate-700">${escapeHtml(record.periode || "—")} hari</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] text-slate-400">Tanggal Selanjutnya</p>
+                                        <p class="font-semibold text-slate-700">${escapeHtml(formatDate(record.tglSelanjutnya))}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-[11px] text-slate-400">Durasi Perbaikan</p>
+                                        <p class="font-semibold text-slate-700">${record.durasiPerbaikanJam == null || record.durasiPerbaikanJam === "" ? "—" : escapeHtml(record.durasiPerbaikanJam + " jam")}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            `;
+
+            document.getElementById("replacementDetailModal").classList.add("show");
+            document.body.style.overflow = "hidden";
+        }
+
+
+        function closeReplacementDetail() {
+            document.getElementById("replacementDetailModal").classList.remove("show");
+            document.body.style.overflow = "";
         }
 
 
@@ -935,6 +1246,14 @@
 
                     tglPenggantian: latest.tglPenggantian || "",
 
+                    // Seluruh tanggal tetap berasal dari catatan historis yang asli.
+                    tanggalPenggantianList: getUniqueDates(records).map(timestamp => {
+                        const date = new Date(timestamp);
+                        return String(date.getDate()).padStart(2, "0") + "-" +
+                            String(date.getMonth() + 1).padStart(2, "0") + "-" +
+                            date.getFullYear();
+                    }),
+
                     keterangan: normalizeType(
                         latest.keterangan || "BERKALA"
                     ),
@@ -1108,6 +1427,128 @@
         }
 
 
+
+        // =========================================================
+        // 9A. DIAGRAM PARETO PENGGANTIAN MOTOR PER SUB MESIN
+        // =========================================================
+
+        function updatePareto(machine) {
+            const chart = document.getElementById("paretoChart");
+            const tableBody = document.getElementById("paretoTableBody");
+            const empty = document.getElementById("paretoEmpty");
+            const chartWrap = document.getElementById("paretoChartWrap");
+            const totalLabel = document.getElementById("paretoTotal");
+            const description = document.getElementById("paretoDescription");
+
+            if (!chart || !tableBody || !empty || !chartWrap || !totalLabel) return;
+
+            description.textContent =
+                "Distribusi jumlah penggantian motor berdasarkan sub mesin pada kelompok " + machine + ".";
+
+            const counts = new Map();
+
+            allHistoryData
+                .filter(item => normalizeMachine(item.namaMesin) === machine)
+                .forEach(item => {
+                    const sub = normalizeText(item.subMesin) || "TIDAK DIKETAHUI";
+                    counts.set(sub, (counts.get(sub) || 0) + 1);
+                });
+
+            const items = Array.from(counts.entries())
+                .map(([name, count]) => ({ name, count }))
+                .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "id"));
+
+            const total = items.reduce((sum, item) => sum + item.count, 0);
+            totalLabel.textContent = total.toLocaleString("id-ID") + " penggantian";
+
+            if (!items.length) {
+                empty.classList.remove("hidden");
+                chartWrap.classList.add("hidden");
+                chart.innerHTML = "";
+                tableBody.innerHTML = `
+                    <tr><td colspan="5" class="py-5 text-center text-slate-400">
+                        Belum ada data untuk kelompok ${escapeHtml(machine)}.
+                    </td></tr>`;
+                return;
+            }
+
+            empty.classList.add("hidden");
+            chartWrap.classList.remove("hidden");
+
+            let cumulative = 0;
+            items.forEach(item => {
+                item.share = item.count / total * 100;
+                cumulative += item.share;
+                item.cumulative = cumulative;
+            });
+
+            const width = Math.max(700, items.length * 112 + 120);
+            const height = 330;
+            const left = 58, right = 62, top = 28, bottom = 88;
+            const plotWidth = width - left - right;
+            const plotHeight = height - top - bottom;
+            const maxCount = Math.max(...items.map(item => item.count), 1);
+            const slot = plotWidth / items.length;
+            const barWidth = Math.min(58, slot * .58);
+            const yCount = value => top + plotHeight - (value / maxCount) * plotHeight;
+            const yPct = value => top + plotHeight - value / 100 * plotHeight;
+
+            let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Pareto penggantian motor per sub mesin ${escapeHtml(machine)}">`;
+
+            for (let tick = 0; tick <= 4; tick++) {
+                const value = maxCount * tick / 4;
+                const y = yCount(value);
+                svg += `<line x1="${left}" y1="${y}" x2="${width-right}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="4 4"/>`;
+                svg += `<text x="${left-10}" y="${y+4}" text-anchor="end" font-size="11" fill="#64748b">${Math.round(value)}</text>`;
+            }
+
+            svg += `<text x="15" y="${top+plotHeight/2}" transform="rotate(-90 15 ${top+plotHeight/2})" text-anchor="middle" font-size="11" fill="#64748b">Jumlah penggantian</text>`;
+            svg += `<text x="${width-12}" y="${top+plotHeight/2}" transform="rotate(90 ${width-12} ${top+plotHeight/2})" text-anchor="middle" font-size="11" fill="#64748b">Kumulatif (%)</text>`;
+
+            const points = [];
+            items.forEach((item, index) => {
+                const x = left + slot * index + slot / 2;
+                const y = yCount(item.count);
+                const barHeight = top + plotHeight - y;
+                const label = item.name.length > 16 ? item.name.slice(0, 14) + "…" : item.name;
+
+                svg += `<rect x="${x-barWidth/2}" y="${y}" width="${barWidth}" height="${barHeight}" rx="5" fill="#0ea5e9"/>`;
+                svg += `<text x="${x}" y="${y-7}" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">${item.count}</text>`;
+                svg += `<text x="${x}" y="${top+plotHeight+20}" text-anchor="middle" font-size="10" fill="#475569">${escapeHtml(label)}</text>`;
+                svg += `<text x="${x}" y="${top+plotHeight+36}" text-anchor="middle" font-size="9" fill="#94a3b8">${item.share.toFixed(1)}%</text>`;
+                points.push(`${x},${yPct(item.cumulative)}`);
+            });
+
+            [0, 25, 50, 75, 100].forEach(value => {
+                const y = yPct(value);
+                svg += `<text x="${width-right+8}" y="${y+4}" font-size="10" fill="#64748b">${value}%</text>`;
+            });
+
+            svg += `<polyline points="${points.join(" ")}" fill="none" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+            items.forEach((item, index) => {
+                const x = left + slot * index + slot / 2;
+                svg += `<circle cx="${x}" cy="${yPct(item.cumulative)}" r="4" fill="#f43f5e" stroke="#fff" stroke-width="2"/>`;
+            });
+            svg += `</svg>`;
+            chart.innerHTML = svg;
+
+            tableBody.innerHTML = items.map((item, index) => `
+                <tr class="hover:bg-slate-50">
+                    <td class="px-3 py-3 text-center font-semibold text-slate-500">${index + 1}</td>
+                    <td class="px-3 py-3 font-semibold text-slate-700">${escapeHtml(item.name)}</td>
+                    <td class="px-3 py-3 text-right font-bold text-slate-800">${item.count}</td>
+                    <td class="px-3 py-3">
+                        <div class="flex items-center gap-2">
+                            <div class="pareto-track flex-1"><div class="pareto-fill" style="width:${item.share}%"></div></div>
+                            <span class="w-12 text-right text-xs text-slate-500">${item.share.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                    <td class="px-3 py-3 text-right font-semibold ${item.cumulative >= 80 ? "text-emerald-700" : "text-slate-600"}">${item.cumulative.toFixed(1)}%</td>
+                </tr>
+            `).join("");
+        }
+
+
         // =========================================================
         // 10. MEMILIH KELOMPOK MESIN
         // =========================================================
@@ -1140,6 +1581,8 @@
 
 
             updateReplacementChart(machine);
+
+            updatePareto(machine);
 
             renderTable();
 
@@ -1214,6 +1657,7 @@
                     </tr>
                 `;
 
+                updatePareto(selectedMachine);
                 return;
 
             }
@@ -1320,8 +1764,25 @@
                         </td>
 
 
-                        <td class="py-3 px-4 whitespace-nowrap">
-                            ${escapeHtml(formatDate(item.tglPenggantian))}
+                        <td class="py-3 px-4 min-w-[190px]">
+                            <div class="replacement-date-list">
+                                ${getMotorReplacementDates(item).length
+                                    ? getMotorReplacementDates(item).map(date => `
+                                        <button type="button"
+                                            class="replacement-date-chip"
+                                            data-motor-name="${escapeHtml(item.namaMotor)}"
+                                            data-sub-machine="${escapeHtml(item.subMesin)}"
+                                            data-date-key="${date.key}"
+                                            title="Klik untuk melihat detail penggantian tanggal ${date.label}">
+                                            <i class="fa-regular fa-calendar-check"></i>
+                                            ${date.label}
+                                        </button>
+                                    `).join("")
+                                    : '<span class="text-slate-400">—</span>'}
+                            </div>
+                            <p class="text-[10px] text-slate-400 mt-1">
+                                ${getMotorReplacementDates(item).length} tanggal tercatat · klik untuk detail
+                            </p>
                         </td>
 
 
@@ -1469,6 +1930,8 @@
 
                 updateReplacementChart(selectedMachine);
 
+                updatePareto(selectedMachine);
+
                 renderTable();
 
 
@@ -1536,6 +1999,31 @@
             }
 
         }
+
+
+
+        // =========================================================
+        // 12A. INTERAKSI TANGGAL & MODAL DETAIL
+        // =========================================================
+
+        document.getElementById("tableBody").addEventListener("click", function(event) {
+            const button = event.target.closest(".replacement-date-chip");
+            if (!button) return;
+
+            openReplacementDetail(
+                button.dataset.motorName,
+                button.dataset.subMachine,
+                button.dataset.dateKey
+            );
+        });
+
+        document.getElementById("replacementDetailModal").addEventListener("click", function(event) {
+            if (event.target === this) closeReplacementDetail();
+        });
+
+        document.addEventListener("keydown", function(event) {
+            if (event.key === "Escape") closeReplacementDetail();
+        });
 
 
         // =========================================================
