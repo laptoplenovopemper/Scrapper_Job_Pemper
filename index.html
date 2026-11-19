@@ -419,7 +419,7 @@
                     </h2>
 
                     <p id="tableDescription" class="text-xs text-slate-500 mt-1">
-                        Data dirangkum berdasarkan nama motor dan sub mesin.
+                        Data dirangkum berdasarkan nama motor dan sub mesin. Gunakan filter tanggal untuk membatasi periode data.
                     </p>
                 </div>
 
@@ -437,6 +437,44 @@
 
                 </div>
 
+            </div>
+
+            <!-- FILTER RENTANG TANGGAL PENGGANTIAN MOTOR -->
+            <div class="px-4 pb-4 flex flex-col sm:flex-row sm:items-end gap-3">
+                <div class="w-full sm:w-56">
+                    <label for="startDateFilter"
+                           class="block text-xs font-semibold text-slate-600 mb-1">
+                        <i class="fa-solid fa-calendar-day text-sky-600 mr-1"></i>
+                        Start Date
+                    </label>
+                    <input id="startDateFilter"
+                           type="date"
+                           onchange="renderTable()"
+                           class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
+                </div>
+
+                <div class="w-full sm:w-56">
+                    <label for="endDateFilter"
+                           class="block text-xs font-semibold text-slate-600 mb-1">
+                        <i class="fa-solid fa-calendar-check text-sky-600 mr-1"></i>
+                        End Date
+                    </label>
+                    <input id="endDateFilter"
+                           type="date"
+                           onchange="renderTable()"
+                           class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:border-pmpAccent">
+                </div>
+
+                <button type="button"
+                        onclick="resetDateFilter()"
+                        class="px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-md transition">
+                    <i class="fa-solid fa-rotate-left mr-1"></i>
+                    Reset Tanggal
+                </button>
+
+                <p id="dateFilterInfo" class="text-xs text-slate-400 sm:ml-auto sm:pb-2">
+                    Menampilkan seluruh tanggal penggantian
+                </p>
             </div>
 
 
@@ -569,17 +607,17 @@
 
 
         <!-- =========================================================
-             ANALISIS PARETO PENGGANTIAN MOTOR PER SUB MESIN
+             ANALISIS PARETO PENGGANTIAN MOTOR PER NAMA MOTOR
              ========================================================= -->
         <section class="bg-white rounded-lg border border-slate-200 shadow-sm p-4 mt-5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                 <div>
                     <h3 class="font-bold text-sm text-slate-800">
                         <i class="fa-solid fa-chart-column text-sky-600 mr-1"></i>
-                        Pareto Penggantian Motor per Sub Mesin
+                        Pareto Penggantian Motor per Nama Motor
                     </h3>
                     <p id="paretoDescription" class="text-xs text-slate-500 mt-1">
-                        Distribusi jumlah penggantian motor pada kelompok FS1.
+                        Distribusi jumlah penggantian berdasarkan nama motor pada kelompok FS1.
                     </p>
                 </div>
                 <span id="paretoTotal" class="text-xs font-bold rounded-full bg-sky-50 text-sky-700 px-3 py-1.5">
@@ -610,7 +648,7 @@
                     <thead>
                         <tr class="bg-slate-800 text-white text-xs uppercase">
                             <th class="px-3 py-3 text-center">No.</th>
-                            <th class="px-3 py-3 text-left">Sub Mesin</th>
+                            <th class="px-3 py-3 text-left">Nama Motor</th>
                             <th class="px-3 py-3 text-right">Jumlah Penggantian</th>
                             <th class="px-3 py-3 text-left min-w-40">Kontribusi</th>
                             <th class="px-3 py-3 text-right">Kumulatif</th>
@@ -622,7 +660,7 @@
                 </table>
             </div>
             <p class="text-xs text-slate-400 mt-3">
-                Pareto dihitung dari jumlah catatan penggantian pada masing-masing sub mesin di kelompok FS yang sedang dipilih.
+                Pareto dihitung dari jumlah catatan penggantian untuk setiap nama motor pada kelompok FS yang sedang dipilih.
             </p>
         </section>
 
@@ -675,6 +713,7 @@
 
 
         let allHistoryData = [];
+        let currentFilteredHistoryData = [];
 
         let selectedMachine = "FS1";
 
@@ -853,13 +892,13 @@
         }
 
 
-        function getMotorReplacementRecords(summary) {
+        function getMotorReplacementRecords(summary, sourceRows = currentFilteredHistoryData) {
             const key = makeGroupKey({
                 namaMotor: summary.namaMotor,
                 subMesin: summary.subMesin
             });
 
-            return allHistoryData.filter(item =>
+            return sourceRows.filter(item =>
                 normalizeMachine(item.namaMesin) === selectedMachine &&
                 makeGroupKey(item) === key
             );
@@ -1181,6 +1220,60 @@
         }
 
 
+
+        // =========================================================
+        // FILTER RENTANG TANGGAL PENGGANTIAN
+        // =========================================================
+
+        function getDateFilteredRows(machine) {
+            const startValue = document.getElementById("startDateFilter")?.value || "";
+            const endValue = document.getElementById("endDateFilter")?.value || "";
+
+            const startTimestamp = startValue
+                ? dateTimestamp(startValue)
+                : null;
+
+            const endTimestamp = endValue
+                ? dateTimestamp(endValue)
+                : null;
+
+            if (startTimestamp && endTimestamp && startTimestamp > endTimestamp) {
+                return {
+                    rows: [],
+                    invalidRange: true,
+                    startValue,
+                    endValue
+                };
+            }
+
+            const rows = allHistoryData.filter(item => {
+                if (normalizeMachine(item.namaMesin) !== machine) return false;
+
+                const timestamp = dateTimestamp(item.tglPenggantian);
+                if (!timestamp) return !startTimestamp && !endTimestamp;
+
+                if (startTimestamp && timestamp < startTimestamp) return false;
+                if (endTimestamp && timestamp > endTimestamp) return false;
+
+                return true;
+            });
+
+            return {
+                rows,
+                invalidRange: false,
+                startValue,
+                endValue
+            };
+        }
+
+
+        function resetDateFilter() {
+            document.getElementById("startDateFilter").value = "";
+            document.getElementById("endDateFilter").value = "";
+            renderTable();
+        }
+
+
         // =========================================================
         // 8. PENGELOMPOKAN MOTOR PER MESIN
         // =========================================================
@@ -1194,9 +1287,9 @@
         }
 
 
-        function buildMachineSummary(machine) {
+        function buildMachineSummary(machine, sourceRows = allHistoryData) {
 
-            const rows = allHistoryData.filter(item =>
+            const rows = sourceRows.filter(item =>
                 normalizeMachine(item.namaMesin) === machine
             );
 
@@ -1432,7 +1525,7 @@
         // 9A. DIAGRAM PARETO PENGGANTIAN MOTOR PER SUB MESIN
         // =========================================================
 
-        function updatePareto(machine) {
+        function updatePareto(machine, sourceRows = null) {
             const chart = document.getElementById("paretoChart");
             const tableBody = document.getElementById("paretoTableBody");
             const empty = document.getElementById("paretoEmpty");
@@ -1442,21 +1535,40 @@
 
             if (!chart || !tableBody || !empty || !chartWrap || !totalLabel) return;
 
-            description.textContent =
-                "Distribusi jumlah penggantian motor berdasarkan sub mesin pada kelompok " + machine + ".";
+            const rows = Array.isArray(sourceRows)
+                ? sourceRows
+                : getDateFilteredRows(machine).rows;
 
+            description.textContent =
+                "Distribusi jumlah penggantian berdasarkan nama motor pada kelompok " +
+                machine + " sesuai rentang tanggal yang dipilih.";
+
+            // Kunci Pareto adalah NAMA MOTOR, bukan sub mesin.
+            // Motor dengan nama sama pada beberapa sub mesin digabung menjadi satu.
             const counts = new Map();
 
-            allHistoryData
+            rows
                 .filter(item => normalizeMachine(item.namaMesin) === machine)
                 .forEach(item => {
-                    const sub = normalizeText(item.subMesin) || "TIDAK DIKETAHUI";
-                    counts.set(sub, (counts.get(sub) || 0) + 1);
+                    const displayName = String(item.namaMotor || "").trim() || "TIDAK DIKETAHUI";
+                    const key = normalizeText(displayName);
+                    const current = counts.get(key);
+
+                    if (current) {
+                        current.count += 1;
+                    } else {
+                        counts.set(key, {
+                            name: displayName,
+                            count: 1
+                        });
+                    }
                 });
 
-            const items = Array.from(counts.entries())
-                .map(([name, count]) => ({ name, count }))
-                .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "id"));
+            const items = Array.from(counts.values())
+                .sort((a, b) =>
+                    b.count - a.count ||
+                    a.name.localeCompare(b.name, "id")
+                );
 
             const total = items.reduce((sum, item) => sum + item.count, 0);
             totalLabel.textContent = total.toLocaleString("id-ID") + " penggantian";
@@ -1466,9 +1578,12 @@
                 chartWrap.classList.add("hidden");
                 chart.innerHTML = "";
                 tableBody.innerHTML = `
-                    <tr><td colspan="5" class="py-5 text-center text-slate-400">
-                        Belum ada data untuk kelompok ${escapeHtml(machine)}.
-                    </td></tr>`;
+                    <tr>
+                        <td colspan="5" class="py-5 text-center text-slate-400">
+                            Belum ada data nama motor untuk kelompok ${escapeHtml(machine)}
+                            pada rentang tanggal yang dipilih.
+                        </td>
+                    </tr>`;
                 return;
             }
 
@@ -1483,8 +1598,8 @@
             });
 
             const width = Math.max(700, items.length * 112 + 120);
-            const height = 330;
-            const left = 58, right = 62, top = 28, bottom = 88;
+            const height = 350;
+            const left = 62, right = 66, top = 30, bottom = 105;
             const plotWidth = width - left - right;
             const plotHeight = height - top - bottom;
             const maxCount = Math.max(...items.map(item => item.count), 1);
@@ -1493,43 +1608,87 @@
             const yCount = value => top + plotHeight - (value / maxCount) * plotHeight;
             const yPct = value => top + plotHeight - value / 100 * plotHeight;
 
-            let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Pareto penggantian motor per sub mesin ${escapeHtml(machine)}">`;
+            let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Diagram Pareto jumlah penggantian berdasarkan nama motor">`;
 
             for (let tick = 0; tick <= 4; tick++) {
                 const value = maxCount * tick / 4;
                 const y = yCount(value);
-                svg += `<line x1="${left}" y1="${y}" x2="${width-right}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="4 4"/>`;
-                svg += `<text x="${left-10}" y="${y+4}" text-anchor="end" font-size="11" fill="#64748b">${Math.round(value)}</text>`;
+                svg += `
+                    <line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}"
+                          stroke="#dbe5f1" stroke-dasharray="5 5"/>
+                    <text x="${left - 10}" y="${y + 4}" text-anchor="end"
+                          font-size="11" fill="#64748b">${Math.round(value)}</text>
+                `;
             }
 
-            svg += `<text x="15" y="${top+plotHeight/2}" transform="rotate(-90 15 ${top+plotHeight/2})" text-anchor="middle" font-size="11" fill="#64748b">Jumlah penggantian</text>`;
-            svg += `<text x="${width-12}" y="${top+plotHeight/2}" transform="rotate(90 ${width-12} ${top+plotHeight/2})" text-anchor="middle" font-size="11" fill="#64748b">Kumulatif (%)</text>`;
+            svg += `
+                <text x="16" y="${top + plotHeight / 2}"
+                      transform="rotate(-90 16 ${top + plotHeight / 2})"
+                      text-anchor="middle" font-size="11" fill="#64748b">
+                    Jumlah penggantian
+                </text>
+                <text x="${width - 12}" y="${top + plotHeight / 2}"
+                      transform="rotate(90 ${width - 12} ${top + plotHeight / 2})"
+                      text-anchor="middle" font-size="11" fill="#64748b">
+                    Kumulatif (%)
+                </text>
+            `;
 
             const points = [];
+
             items.forEach((item, index) => {
-                const x = left + slot * index + slot / 2;
-                const y = yCount(item.count);
-                const barHeight = top + plotHeight - y;
-                const label = item.name.length > 16 ? item.name.slice(0, 14) + "…" : item.name;
+                const centerX = left + slot * index + slot / 2;
+                const barY = yCount(item.count);
+                const barHeight = top + plotHeight - barY;
+                const label = item.name.length > 19
+                    ? item.name.slice(0, 17) + "…"
+                    : item.name;
 
-                svg += `<rect x="${x-barWidth/2}" y="${y}" width="${barWidth}" height="${barHeight}" rx="5" fill="#0ea5e9"/>`;
-                svg += `<text x="${x}" y="${y-7}" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">${item.count}</text>`;
-                svg += `<text x="${x}" y="${top+plotHeight+20}" text-anchor="middle" font-size="10" fill="#475569">${escapeHtml(label)}</text>`;
-                svg += `<text x="${x}" y="${top+plotHeight+36}" text-anchor="middle" font-size="9" fill="#94a3b8">${item.share.toFixed(1)}%</text>`;
-                points.push(`${x},${yPct(item.cumulative)}`);
+                svg += `
+                    <rect x="${centerX - barWidth / 2}" y="${barY}"
+                          width="${barWidth}" height="${barHeight}"
+                          rx="6" fill="#0ea5e9"/>
+                    <text x="${centerX}" y="${barY - 8}" text-anchor="middle"
+                          font-size="11" font-weight="700" fill="#334155">
+                        ${item.count}
+                    </text>
+                    <text x="${centerX}" y="${top + plotHeight + 20}"
+                          text-anchor="middle" font-size="10" fill="#475569">
+                        ${escapeHtml(label)}
+                    </text>
+                    <text x="${centerX}" y="${top + plotHeight + 37}"
+                          text-anchor="middle" font-size="9" fill="#94a3b8">
+                        ${item.share.toFixed(1)}%
+                    </text>
+                `;
+
+                points.push(`${centerX},${yPct(item.cumulative)}`);
             });
 
-            [0, 25, 50, 75, 100].forEach(value => {
-                const y = yPct(value);
-                svg += `<text x="${width-right+8}" y="${y+4}" font-size="10" fill="#64748b">${value}%</text>`;
+            [0, 25, 50, 75, 100].forEach(percent => {
+                const y = yPct(percent);
+                svg += `
+                    <text x="${width - right + 8}" y="${y + 4}"
+                          font-size="10" fill="#64748b">${percent}%</text>
+                `;
             });
 
-            svg += `<polyline points="${points.join(" ")}" fill="none" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+            svg += `
+                <polyline points="${points.join(" ")}"
+                          fill="none" stroke="#f43f5e" stroke-width="3"
+                          stroke-linecap="round" stroke-linejoin="round"/>
+            `;
+
             items.forEach((item, index) => {
-                const x = left + slot * index + slot / 2;
-                svg += `<circle cx="${x}" cy="${yPct(item.cumulative)}" r="4" fill="#f43f5e" stroke="#fff" stroke-width="2"/>`;
+                const centerX = left + slot * index + slot / 2;
+                const y = yPct(item.cumulative);
+                svg += `
+                    <circle cx="${centerX}" cy="${y}" r="4.5"
+                            fill="#f43f5e" stroke="#ffffff" stroke-width="2"/>
+                `;
             });
-            svg += `</svg>`;
+
+            svg += "</svg>";
             chart.innerHTML = svg;
 
             tableBody.innerHTML = items.map((item, index) => `
@@ -1539,11 +1698,15 @@
                     <td class="px-3 py-3 text-right font-bold text-slate-800">${item.count}</td>
                     <td class="px-3 py-3">
                         <div class="flex items-center gap-2">
-                            <div class="pareto-track flex-1"><div class="pareto-fill" style="width:${item.share}%"></div></div>
+                            <div class="pareto-track flex-1">
+                                <div class="pareto-fill" style="width:${item.share}%"></div>
+                            </div>
                             <span class="w-12 text-right text-xs text-slate-500">${item.share.toFixed(1)}%</span>
                         </div>
                     </td>
-                    <td class="px-3 py-3 text-right font-semibold ${item.cumulative >= 80 ? "text-emerald-700" : "text-slate-600"}">${item.cumulative.toFixed(1)}%</td>
+                    <td class="px-3 py-3 text-right font-semibold ${item.cumulative >= 80 ? "text-emerald-700" : "text-slate-600"}">
+                        ${item.cumulative.toFixed(1)}%
+                    </td>
                 </tr>
             `).join("");
         }
@@ -1603,14 +1766,36 @@
             );
 
 
-            // Ambil seluruh ringkasan pada mesin terpilih.
+            // Filter tanggal diterapkan pada catatan mentah sebelum diringkas.
+            const dateFilter = getDateFilteredRows(selectedMachine);
+            const dateInfo = document.getElementById("dateFilterInfo");
 
-            const machineSummary = buildMachineSummary(selectedMachine);
+            if (dateFilter.invalidRange) {
+                currentFilteredHistoryData = [];
+                dateInfo.textContent = "Tanggal awal tidak boleh melewati tanggal akhir.";
+                dateInfo.classList.add("text-rose-600");
+            } else {
+                currentFilteredHistoryData = dateFilter.rows;
+                dateInfo.classList.remove("text-rose-600");
 
+                if (dateFilter.startValue || dateFilter.endValue) {
+                    dateInfo.textContent =
+                        "Menampilkan " + currentFilteredHistoryData.length.toLocaleString("id-ID") +
+                        " catatan sesuai rentang tanggal";
+                } else {
+                    dateInfo.textContent = "Menampilkan seluruh tanggal penggantian";
+                }
+            }
+
+            const machineSummary = buildMachineSummary(
+                selectedMachine,
+                currentFilteredHistoryData
+            );
+
+            // Pareto menggunakan catatan hasil filter tanggal dan dihitung berdasarkan NAMA MOTOR.
+            updatePareto(selectedMachine, currentFilteredHistoryData);
 
             // Pencarian hanya memengaruhi tabel.
-            // Statistik tetap menggunakan seluruh data mesin.
-
             const data = machineSummary.filter(item => {
 
                 return !search ||
@@ -1641,6 +1826,18 @@
                 machineSummary.length.toLocaleString("id-ID") +
                 " jenis motor ditampilkan";
 
+
+            if (dateFilter.invalidRange) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="10" class="text-center py-10 text-rose-500">
+                            Tanggal awal tidak boleh lebih besar daripada tanggal akhir.
+                        </td>
+                    </tr>
+                `;
+                document.getElementById("recordCount").textContent = "Rentang tanggal tidak valid";
+                return;
+            }
 
             // DATABASE KOSONG
 
@@ -1678,7 +1875,7 @@
 
                             Tidak ada data motor untuk
                             ${escapeHtml(selectedMachine)}
-                            ${search ? " yang cocok dengan pencarian." : "."}
+                            ${search ? " yang cocok dengan pencarian." : (dateFilter.startValue || dateFilter.endValue ? " pada rentang tanggal yang dipilih." : ".")}
 
                         </td>
                     </tr>
