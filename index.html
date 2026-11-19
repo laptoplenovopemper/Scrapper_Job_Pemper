@@ -1718,6 +1718,7 @@
                 const isFinished = [
                     "success",
                     "completed",
+                    "no_data",
                     "failed",
                     "error",
                     "cancelled"
@@ -1736,6 +1737,35 @@
                                 true
                             );
                         }, 350);
+
+                    } else if (status === "no_data") {
+                        setTimeout(() => {
+                            showModal(
+                                "Data Tidak Ditemukan",
+                                `
+                                    <div class="text-center py-3">
+                                        <i class="fa-solid fa-circle-info text-amber-500 text-4xl mb-3"></i>
+                                        <p class="text-slate-800 font-semibold text-base">
+                                            ${escapeHtml(data.message || "Scraper selesai, tetapi tidak menemukan data pada rentang tanggal yang dipilih.")}
+                                        </p>
+                                        <p class="text-sm text-slate-500 mt-2">
+                                            Tekan tombol Tutup untuk memuat ulang halaman.
+                                        </p>
+                                    </div>
+                                `,
+                                "fa-solid fa-circle-info",
+                                () => {
+                                    closeModal();
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 350);
+                                },
+                                true,
+                                "Tutup",
+                                "bg-amber-500 hover:bg-amber-600"
+                            );
+                        }, 350);
+
                     } else {
                         setTimeout(() => {
                             showNotification(
