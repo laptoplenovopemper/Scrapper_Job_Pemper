@@ -1687,16 +1687,18 @@ def send_to_google_sheets(all_data):
 
     if not all_data:
 
-        print(
-            "Tidak ada data dari kedua sumber."
-        )
+    print(
+        "Tidak ada data dari kedua sumber."
+    )
 
-        update_progress(
-            95,
-            "Tidak ada data baru untuk dikirim ke Google Sheets."
-        )
+    print(
+        "Mengirim data kosong untuk membersihkan Sheet1."
+    )
 
-        return
+    update_progress(
+        85,
+        "Tidak ada data. Membersihkan Sheet1."
+    )
 
     print(
         f"Total data gabungan: {len(all_data)}"
@@ -1885,16 +1887,31 @@ def run_scraper():
         )
 
         print("\n")
-
         print("=" * 60)
         print("SELURUH PROSES SELESAI")
         print("=" * 60)
 
-        update_progress(
-            100,
-            "Seluruh proses scraper berhasil diselesaikan.",
-            status="completed"
-        )
+        if combined_data:
+
+            update_progress(
+                100,
+                (
+                    f"Scraper selesai. "
+                    f"Berhasil memproses {len(combined_data)} data."
+                ),
+                status="completed"
+            )
+
+        else:
+
+            update_progress(
+                100,
+                (
+                    f"Tidak ditemukan data Penggantian Motor "
+                    f"pada tanggal {date_from} sampai {date_to}."
+                ),
+                status="no_data"
+            )
 
     except Exception as e:
 
