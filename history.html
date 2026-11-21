@@ -324,6 +324,128 @@
         }
 
 
+        // Normalisasi pembanding duplikat: semua spasi dihilangkan,
+        // termasuk tab, newline, NBSP, dan zero-width characters.
+        // "AGITATOR VAT" dan "AGITATORVAT" dianggap sama.
+        function normalizeDuplicateValue(value) {
+            return String(value == null ? '' : value)
+                .normalize('NFKC')
+                .toUpperCase()
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .replace(/[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000\s]+/g, '')
+                .trim();
+        }
+
+
+        function normalizeDuplicateDate(value) {
+            if (!value) return '';
+
+            const text = String(value).trim();
+            let match = text.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})$/);
+
+            if (match) {
+                let year = Number(match[3]);
+                if (year < 100) year += year <= 49 ? 2000 : 1900;
+
+                return [
+                    year,
+                    String(Number(match[2])).padStart(2, '0'),
+                    String(Number(match[1])).padStart(2, '0')
+                ].join('-');
+            }
+
+            match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+
+            if (match) {
+                return [
+                    Number(match[1]),
+                    String(Number(match[2])).padStart(2, '0'),
+                    String(Number(match[3])).padStart(2, '0')
+                ].join('-');
+            }
+
+            return '';
+        }
+
+
+        // Perlindungan tampilan history: record lama yang telanjur
+        // terduplikasi di database tidak dihitung dua kali.
+        // AppSheet Record Key menjadi identitas utama jika tersedia.
+        // Untuk data lama tanpa key, gunakan motor + mesin + sub mesin
+        // + tanggal + jenis setelah normalisasi tanpa spasi.
+        function removeDuplicateHistoryRecords(records) {
+            const seenAppKeys = new Set();
+            const seenFallback = new Map();
+            const unique = [];
+
+            (records || []).forEach(item => {
+                const appKey = String(
+                    item.appsheetRecordKey || item.appSheetRecordKey || ''
+                ).trim();
+
+                const parsed = splitMotorAndMachine(
+                    item.namaMotor,
+                    getRecordMachine(item),
+                    getRecordSubMachine(item)
+                );
+
+                const motorKey = normalizeDuplicateValue(
+                    parsed.motorName || item.namaMotor
+                );
+                const machineKey = normalizeDuplicateValue(
+                    parsed.machineName || getRecordMachine(item)
+                );
+                const subKey = normalizeDuplicateValue(
+                    parsed.subMachineName || getRecordSubMachine(item)
+                );
+                const dateKey = normalizeDuplicateDate(item.tglPenggantian);
+                const typeKey = normalizeDuplicateValue(
+                    item.keterangan || 'BERKALA'
+                );
+
+                const fallbackKey = [
+                    motorKey,
+                    machineKey,
+                    subKey,
+                    dateKey,
+                    typeKey
+                ].join('||');
+
+                if (appKey && seenAppKeys.has(appKey)) {
+                    return;
+                }
+
+                if (fallbackKey && seenFallback.has(fallbackKey)) {
+                    const previousAppKey = seenFallback.get(fallbackKey);
+
+                    // Dua AppSheet Record Key berbeda bisa menunjukkan
+                    // dua pekerjaan nyata pada motor/tanggal yang sama.
+                    // Jangan satukan jika keduanya sama-sama memiliki key
+                    // berbeda. Jika salah satu tidak punya key, anggap
+                    // sebagai duplikat data legacy.
+                    if (
+                        !appKey ||
+                        !previousAppKey ||
+                        appKey === previousAppKey
+                    ) {
+                        if (appKey) seenAppKeys.add(appKey);
+                        return;
+                    }
+                }
+
+                if (appKey) seenAppKeys.add(appKey);
+
+                if (fallbackKey && !seenFallback.has(fallbackKey)) {
+                    seenFallback.set(fallbackKey, appKey);
+                }
+
+                unique.push(item);
+            });
+
+            return unique;
+        }
+
+
         // =====================================================
         // 3. MEMISAHKAN NAMA MOTOR, MESIN, DAN SUB MESIN
         // =====================================================
@@ -498,7 +620,16 @@
                     throw new Error('Format data history bukan array.');
                 }
 
-                rawHistoryData = result;
+                // Hilangkan duplikat sebelum agregasi agar jumlah
+                // penggantian dan MTTR tidak terhitung berulang.
+                rawHistoryData = removeDuplicateHistoryRecords(result);
+
+                if (rawHistoryData.length !== result.length) {
+                    console.warn(
+                        'History: ' + (result.length - rawHistoryData.length) +
+                        ' record duplikat disembunyikan setelah normalisasi.'
+                    );
+                }
 
                 const motorMap = new Map();
 
