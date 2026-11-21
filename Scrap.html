@@ -152,6 +152,7 @@
                             <th class="py-3 px-4">Tanggal Penggantian Berkala Terakhir</th>
                             <th class="py-3 px-4">Personil</th>
                             <th class="py-3 px-4">Keterangan</th>
+                            <th class="py-3 px-4 text-center">Durasi Perbaikan (Jam)</th>
                             <th class="py-3 px-4 text-center">Periode</th>
 
                             <th class="py-3 px-4 cursor-pointer hover:bg-slate-700 transition select-none"
@@ -166,7 +167,7 @@
 
                     <tbody id="tableBody" class="divide-y divide-slate-200 text-sm">
                         <tr>
-                            <td colspan="10" class="text-center py-6 text-slate-400">
+                            <td colspan="11" class="text-center py-6 text-slate-400">
                                 <i class="fa-solid fa-spinner fa-spin text-xl mb-2"></i>
                                 <br>
                                 Memuat data...
@@ -527,7 +528,7 @@
 
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="10" class="text-center py-6 text-slate-400">
+                            <td colspan="11" class="text-center py-6 text-slate-400">
                                 Tidak ada data ditemukan.
                             </td>
                         </tr>
@@ -540,27 +541,26 @@
                     // Format lama 7 kolom.
                     if (row.length === 7) {
                         return [
-                            upper(row[0]),
-                            upper(row[1]),
-                            "",
-                            row[2],
-                            upper(row[3]),
-                            upper(row[4]),
-                            row[5],
-                            row[6]
+                            upper(row[0]), upper(row[1]), "", row[2],
+                            upper(row[3]), upper(row[4]), "", row[5], row[6],
+                            "", "", ""
                         ];
                     }
 
-                    // Format baru 8 kolom.
+                    // Format 8 kolom sebelum data MTTR.
+                    if (row.length === 8) {
+                        return [
+                            upper(row[0]), upper(row[1]), upper(row[2]), row[3],
+                            upper(row[4]), upper(row[5]), "", row[6], row[7],
+                            "", "", ""
+                        ];
+                    }
+
+                    // Format terbaru: 12 kolom (termasuk key AppSheet).
                     return [
-                        upper(row[0]),
-                        upper(row[1]),
-                        upper(row[2]),
-                        row[3],
-                        upper(row[4]),
-                        upper(row[5]),
-                        row[6],
-                        row[7]
+                        upper(row[0]), upper(row[1]), upper(row[2]), row[3],
+                        upper(row[4]), upper(row[5]), row[10] || "",
+                        row[6], row[7], row[8] || "", row[9] || "", row[10] || ""
                     ];
                 });
 
@@ -571,7 +571,7 @@
 
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="10" class="text-center py-6 text-rose-500">
+                        <td colspan="11" class="text-center py-6 text-rose-500">
                             Gagal memuat data dari server.
                         </td>
                     </tr>
@@ -592,7 +592,7 @@
             if (!data || data.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="10" class="text-center py-6 text-slate-400">
+                        <td colspan="11" class="text-center py-6 text-slate-400">
                             Tidak ada data yang sesuai.
                         </td>
                     </tr>
@@ -610,8 +610,17 @@
                 const personil = escapeHtml(upper(row[4]) || "-");
 
                 const ket = upper(row[5] || "BERKALA");
-                const periodeVal = escapeHtml(row[6] || "180");
-                const tanggalSelanjutnya = escapeHtml(row[7] || "-");
+                const durasiMenit = Number(row[6] || 0);
+                const durasiJam = durasiMenit > 0
+                    ? (durasiMenit / 60).toLocaleString("id-ID", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }) + " jam"
+                    : "—";
+                const waktuMulai = String(row[9] || "").trim();
+                const waktuSelesai = String(row[10] || "").trim();
+                const periodeVal = escapeHtml(row[7] || "180");
+                const tanggalSelanjutnya = escapeHtml(row[8] || "-");
 
                 const badgeClass =
                     ket === "PERBAIKAN"
@@ -655,6 +664,17 @@
                         <span class="${badgeClass} px-2.5 py-1 rounded-full text-xs font-bold">
                             ${escapeHtml(ket)}
                         </span>
+                    </td>
+
+                    <td class="py-3 px-4 text-center font-semibold text-sky-700">
+                        ${ket === "PERBAIKAN" ? `
+                            <div>${durasiJam}</div>
+                            <div class="text-[10px] text-slate-400 font-normal">
+                                ${waktuMulai || waktuSelesai
+                                    ? `${escapeHtml(waktuMulai || "?")} – ${escapeHtml(waktuSelesai || "?")}`
+                                    : "Waktu tidak tersedia"}
+                            </div>
+                        ` : "—"}
                     </td>
 
                     <td class="py-3 px-4 text-center">
@@ -717,8 +737,8 @@
                 : "fa-solid fa-sort-down ml-1 text-sky-400";
 
             globalData.sort((a, b) => {
-                const dateA = parseLocalDate(a[7]);
-                const dateB = parseLocalDate(b[7]);
+                const dateA = parseLocalDate(a[8]);
+                const dateB = parseLocalDate(b[8]);
 
                 return sortAscending
                     ? dateA - dateB
@@ -1079,7 +1099,7 @@
 
             const formattedDate = formatDateForInput(row[3]);
 
-            const currentPeriode = row[6] || "180";
+            const currentPeriode = row[7] || "180";
             const currentKet = upper(row[5] || "BERKALA");
 
             if (!formattedDate) {
