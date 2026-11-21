@@ -202,67 +202,6 @@
 
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
 
-    <!-- MODAL INPUT BATCH SHUTDOWN -->
-    <div id="shutdownModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/60 p-3">
-        <div class="bg-white w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl shadow-2xl">
-            <div class="bg-slate-800 text-white px-5 py-4 flex items-center justify-between">
-                <div>
-                    <h2 class="font-bold text-lg">Catat Kegiatan Shutdown Berkala</h2>
-                    <p class="text-xs text-slate-300">Daftar motor diambil hanya dari catatan penggantian berjenis BERKALA.</p>
-                </div>
-                <button type="button" onclick="closeShutdownModal()" class="text-white hover:text-slate-300 text-xl" aria-label="Tutup">&times;</button>
-            </div>
-
-            <form id="shutdownForm" onsubmit="saveShutdownBatch(event)" class="p-5 space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label for="shutdownDate" class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Shutdown *</label>
-                        <input id="shutdownDate" type="date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label for="shutdownDuration" class="block text-xs font-semibold text-slate-600 mb-1">Durasi Total Shutdown (Jam) *</label>
-                        <input id="shutdownDuration" type="number" min="6" max="12" step="0.1" value="12" required placeholder="Contoh: 8" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                        <p class="text-[11px] text-slate-400 mt-1">Masukkan total durasi kegiatan (6–12 jam), bukan durasi per motor.</p>
-                    </div>
-                    <div>
-                        <label for="shutdownPIC" class="block text-xs font-semibold text-slate-600 mb-1">Penanggung Jawab</label>
-                        <input id="shutdownPIC" type="text" placeholder="Nama penanggung jawab" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label for="shutdownNote" class="block text-xs font-semibold text-slate-600 mb-1">Keterangan</label>
-                        <input id="shutdownNote" type="text" placeholder="Catatan kegiatan (opsional)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
-                </div>
-
-                <div class="border border-slate-200 rounded-lg overflow-hidden">
-                    <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-700">Pilih Motor Berkala yang Dikerjakan</h3>
-                            <p id="shutdownMachineLabel" class="text-xs text-slate-500">Kelompok FS1</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button type="button" onclick="toggleShutdownMotorSelection(true)" class="text-xs text-sky-700 font-semibold">Pilih Semua</button>
-                            <button type="button" onclick="toggleShutdownMotorSelection(false)" class="text-xs text-slate-500 font-semibold">Kosongkan</button>
-                        </div>
-                    </div>
-                    <div id="shutdownMotorList" class="p-3 max-h-64 overflow-y-auto space-y-2">
-                        <p class="text-sm text-slate-400">Memuat daftar motor...</p>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 pt-2">
-                    <p id="shutdownSelectedCount" class="text-xs text-slate-500">0 motor dipilih</p>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="closeShutdownModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold">Batal</button>
-                        <button id="saveShutdownButton" type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
-                            <i class="fa-solid fa-floppy-disk mr-1"></i> Simpan Kegiatan
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- HEADER -->
     <header class="bg-pmpDark text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -482,13 +421,12 @@
                         Preventive Maintenance — Batch Shutdown
                     </h2>
                     <p class="text-xs text-slate-500 mt-1">
-                        Durasi dicatat satu kali per kegiatan shutdown, meskipun beberapa motor dikerjakan bersamaan.
+                        Data otomatis dikelompokkan dari riwayat penggantian BERKALA per tanggal dan kelompok mesin. Durasi awal 12 jam dan dapat diedit.
                     </p>
                 </div>
-                <button type="button" onclick="openShutdownModal()"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm">
-                    <i class="fa-solid fa-plus mr-1"></i> Catat Kegiatan Shutdown
-                </button>
+                <span class="inline-flex items-center rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                    <i class="fa-solid fa-database mr-2"></i> Sumber: Data BERKALA
+                </span>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4">
@@ -1881,6 +1819,8 @@
 
             renderTable();
 
+            loadShutdownData();
+
         }
 
 
@@ -2394,7 +2334,7 @@
         async function loadShutdownData() {
             const tbody = document.getElementById("shutdownTableBody");
             try {
-                const result = await shutdownPost({ action: "get_shutdown_data" });
+                const result = await shutdownPost({ action: "get_shutdown_data", namaMesin: selectedMachine });
                 shutdownData = Array.isArray(result) ? result : [];
 
                 const totalHours = shutdownData.reduce(
@@ -2420,7 +2360,20 @@
                     <tr class="hover:bg-slate-50">
                         <td class="px-3 py-3 font-semibold text-slate-700">${escapeHtml(item.idShutdown)}</td>
                         <td class="px-3 py-3">${escapeHtml(item.tanggalShutdown || "—")}</td>
-                        <td class="px-3 py-3 text-right font-semibold">${Number(item.durasiShutdownJam || 0).toLocaleString("id-ID")} jam</td>
+                        <td class="px-3 py-3 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <input type="number" min="6" max="12" step="0.1"
+                                    value="${Number(item.durasiShutdownJam || 12)}"
+                                    data-shutdown-id="${escapeHtml(item.idShutdown)}"
+                                    class="w-20 rounded-md border border-slate-300 px-2 py-1 text-right text-xs font-semibold"
+                                    aria-label="Durasi shutdown dalam jam">
+                                <button type="button"
+                                    onclick="updateShutdownDuration('${escapeHtml(item.idShutdown)}')"
+                                    class="rounded-md bg-sky-600 hover:bg-sky-700 px-2 py-1 text-xs font-semibold text-white">
+                                    Simpan
+                                </button>
+                            </div>
+                        </td>
                         <td class="px-3 py-3 text-right">${Number(item.jumlahMotor || 0)}</td>
                         <td class="px-3 py-3 text-xs text-slate-600">${escapeHtml((item.motors || []).map(m => m.namaMotor).join(", "))}</td>
                     </tr>
@@ -2432,21 +2385,64 @@
         }
 
 
+        async function updateShutdownDuration(idShutdown) {
+            const input = Array.from(document.querySelectorAll("[data-shutdown-id]"))
+                .find(el => el.dataset.shutdownId === idShutdown);
+
+            if (!input) return;
+
+            const duration = Number(input.value);
+            if (!Number.isFinite(duration) || duration < 6 || duration > 12) {
+                alert("Durasi shutdown harus berada di antara 6 sampai 12 jam.");
+                return;
+            }
+
+            try {
+                await shutdownPost({
+                    action: "update_shutdown_duration",
+                    idShutdown: idShutdown,
+                    durasiShutdownJam: duration
+                });
+                await loadShutdownData();
+                alert("Durasi shutdown berhasil diperbarui.");
+            } catch (error) {
+                console.error(error);
+                alert("Gagal memperbarui durasi shutdown: " + error.message);
+            }
+        }
+
+
+        function getShutdownMotorFields(item) {
+            let namaMotor = String(item.namaMotor || "").trim();
+            let namaMesin = normalizeMachine(item.namaMesin);
+            let subMesin = String(item.subMesin || "").trim();
+
+            // Kompatibilitas dengan arsip bulanan lama:
+            // "NAMA MOTOR (FS1 - SUB MESIN)".
+            if (!namaMesin) {
+                const match = namaMotor.match(/^(.*?)\\s*\\((FS\\s*0*\\d{1,2})(?:\\s*-\\s*(.*?))?\\)\\s*$/i);
+                if (match) {
+                    namaMotor = match[1].trim();
+                    namaMesin = normalizeMachine(match[2]);
+                    if (!subMesin) subMesin = String(match[3] || "").trim();
+                }
+            }
+
+            return { namaMotor, namaMesin, subMesin };
+        }
+
+
         function getShutdownMotorCatalog() {
             const unique = new Map();
 
             allHistoryData
                 .filter(item =>
-                    normalizeMachine(item.namaMesin) === selectedMachine &&
                     normalizeType(item.keterangan) === "BERKALA" &&
                     !!parseDate(item.tglPenggantian)
                 )
-                .forEach(item => {
-                    const motor = {
-                        namaMotor: String(item.namaMotor || "").trim(),
-                        namaMesin: normalizeMachine(item.namaMesin),
-                        subMesin: String(item.subMesin || "").trim()
-                    };
+                .map(getShutdownMotorFields)
+                .filter(motor => motor.namaMesin === selectedMachine)
+                .forEach(motor => {
                     if (!motor.namaMotor || !motor.namaMesin) return;
 
                     const key = [
@@ -2462,133 +2458,6 @@
                 a.namaMotor.localeCompare(b.namaMotor, "id") ||
                 a.subMesin.localeCompare(b.subMesin, "id")
             );
-        }
-
-
-        function openShutdownModal() {
-            const modal = document.getElementById("shutdownModal");
-            const now = new Date();
-            const localDate = [
-                now.getFullYear(),
-                String(now.getMonth() + 1).padStart(2, "0"),
-                String(now.getDate()).padStart(2, "0")
-            ].join("-");
-
-            document.getElementById("shutdownDate").value = localDate;
-            document.getElementById("shutdownDuration").value = "12";
-            document.getElementById("shutdownPIC").value = "";
-            document.getElementById("shutdownNote").value = "";
-            document.getElementById("shutdownMachineLabel").textContent =
-                "Kelompok " + selectedMachine;
-
-            const motors = getShutdownMotorCatalog();
-            const list = document.getElementById("shutdownMotorList");
-
-            if (!motors.length) {
-                list.innerHTML = `<p class="text-sm text-amber-600">Belum ada data motor untuk ${escapeHtml(selectedMachine)}. Muat ulang data motor terlebih dahulu.</p>`;
-            } else {
-                list.innerHTML = motors.map((motor, index) => `
-                    <label class="flex items-start gap-3 p-2 rounded-md hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200">
-                        <input type="checkbox" name="shutdownMotor" value="${index}" class="shutdown-motor-checkbox mt-1 accent-emerald-600" onchange="updateShutdownSelectedCount()">
-                        <span class="min-w-0">
-                            <span class="block text-sm font-semibold text-slate-700">${escapeHtml(motor.namaMotor)}</span>
-                            <span class="block text-xs text-slate-400">${escapeHtml(motor.namaMesin)}${motor.subMesin ? " • " + escapeHtml(motor.subMesin) : ""}</span>
-                        </span>
-                    </label>
-                `).join("");
-                window.shutdownMotorCatalog = motors;
-            }
-
-            updateShutdownSelectedCount();
-            modal.classList.remove("hidden");
-            modal.classList.add("flex");
-            document.body.style.overflow = "hidden";
-        }
-
-
-        function closeShutdownModal() {
-            const modal = document.getElementById("shutdownModal");
-            modal.classList.add("hidden");
-            modal.classList.remove("flex");
-            document.body.style.overflow = "";
-        }
-
-
-        function toggleShutdownMotorSelection(checked) {
-            document.querySelectorAll(".shutdown-motor-checkbox").forEach(input => {
-                input.checked = checked;
-            });
-            updateShutdownSelectedCount();
-        }
-
-
-        function updateShutdownSelectedCount() {
-            const count = document.querySelectorAll(".shutdown-motor-checkbox:checked").length;
-            document.getElementById("shutdownSelectedCount").textContent =
-                count.toLocaleString("id-ID") + " motor dipilih";
-        }
-
-
-        async function saveShutdownBatch(event) {
-            event.preventDefault();
-            if (shutdownSaving) return;
-
-            const date = document.getElementById("shutdownDate").value;
-            const duration = Number(document.getElementById("shutdownDuration").value);
-            const selected = Array.from(
-                document.querySelectorAll(".shutdown-motor-checkbox:checked")
-            );
-
-            if (!date) {
-                alert("Tanggal shutdown wajib diisi.");
-                return;
-            }
-            if (!Number.isFinite(duration) || duration < 6 || duration > 12) {
-                alert("Durasi shutdown harus berada di antara 6 sampai 12 jam.");
-                return;
-            }
-            if (!selected.length) {
-                alert("Pilih minimal satu motor.");
-                return;
-            }
-
-            const motors = selected.map(input => window.shutdownMotorCatalog[Number(input.value)]);
-            const button = document.getElementById("saveShutdownButton");
-
-            shutdownSaving = true;
-            button.disabled = true;
-            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Menyimpan...';
-
-            try {
-                const result = await shutdownPost({
-                    action: "save_shutdown_batch",
-                    tanggalShutdown: date,
-                    durasiShutdownJam: duration,
-                    penanggungJawab: document.getElementById("shutdownPIC").value,
-                    keterangan: document.getElementById("shutdownNote").value,
-                    motors: motors
-                });
-
-                closeShutdownModal();
-                await loadShutdownData();
-
-                if (typeof showNotification === "function") {
-                    showNotification(
-                        "Berhasil",
-                        result.message + " ID: " + result.idShutdown,
-                        true
-                    );
-                } else {
-                    alert(result.message + "\nID: " + result.idShutdown);
-                }
-            } catch (error) {
-                console.error("Gagal menyimpan batch shutdown:", error);
-                alert("Gagal menyimpan kegiatan shutdown: " + error.message);
-            } finally {
-                shutdownSaving = false;
-                button.disabled = false;
-                button.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i> Simpan Kegiatan';
-            }
         }
 
 
