@@ -610,15 +610,17 @@
                 const personil = escapeHtml(upper(row[4]) || "-");
 
                 const ket = upper(row[5] || "BERKALA");
-                const durasiMenit = Number(row[6] || 0);
+                const durasiMenit = Number(
+                    String(row[6] == null ? "" : row[6]).trim().replace(",", ".")
+                ) || 0;
                 const durasiJam = durasiMenit > 0
                     ? (durasiMenit / 60).toLocaleString("id-ID", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }) + " jam"
                     : "—";
-                const waktuMulai = String(row[9] || "").trim();
-                const waktuSelesai = String(row[10] || "").trim();
+                // Durasi sudah dipetakan dari kolom J Sheet1 (menit).
+                // Waktu mulai/selesai tidak ditampilkan sebagai pengganti durasi.
                 const periodeVal = escapeHtml(row[7] || "180");
                 const tanggalSelanjutnya = escapeHtml(row[8] || "-");
 
@@ -668,11 +670,8 @@
 
                     <td class="py-3 px-4 text-center font-semibold text-sky-700">
                         ${ket === "PERBAIKAN" ? `
-                            <div>${durasiJam}</div>
-                            <div class="text-[10px] text-slate-400 font-normal">
-                                ${waktuMulai || waktuSelesai
-                                    ? `${escapeHtml(waktuMulai || "?")} – ${escapeHtml(waktuSelesai || "?")}`
-                                    : "Waktu tidak tersedia"}
+                            <div title="Diambil langsung dari kolom Durasi Pekerjaan AppSheet">
+                                ${durasiJam}
                             </div>
                         ` : "—"}
                     </td>
