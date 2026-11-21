@@ -1409,6 +1409,36 @@ def get_appsheet_value(item, column_name):
     return ""
 
 
+def get_appsheet_duration_value(item):
+    """Ambil nilai durasi langsung dari kolom durasi AppSheet.
+
+    AppSheet kadang mengirim variasi nama kolom (mis. dengan
+    '(menit)' atau spasi/tanda baca). Karena itu pencarian dilakukan
+    dengan nama normalisasi dan pencocokan awalan yang spesifik.
+    Tidak pernah memakai waktu mulai/selesai sebagai fallback.
+    """
+    preferred_names = [
+        "Durasi Pekerjaan (Menit)",
+        "Durasi pekerjaan",
+        "Durasi Pekerjaan"
+    ]
+
+    for name in preferred_names:
+        value = get_appsheet_value(item, name)
+        if value is not None and str(value).strip() != "":
+            return value, name
+
+    for key, value in item.items():
+        # Buang spasi, tanda kurung, dan tanda baca agar variasi label
+        # seperti "Durasi pekerjaan (menit)" tetap dikenali.
+        normalized = re.sub(r"[^a-z0-9]", "", str(key or "").lower())
+        if normalized.startswith("durasipekerjaan") and value is not None and str(value).strip() != "":
+            return value, str(key)
+
+    return "", "KOLOM TIDAK DITEMUKAN / KOSONG"
+
+
+
 
 def normalize_appsheet_time(value):
     """
@@ -1453,27 +1483,58 @@ def normalize_appsheet_time(value):
 
 
 def parse_appsheet_duration_minutes(value):
+    """Konversi nilai kolom Durasi Pekerjaan AppSheet menjadi menit.
+
+    Kolom sumber berunit menit. Mendukung angka desimal (90, 90.00,
+    90,00), format H:MM[:SS], dan format durasi AppSheet D.HH:MM:SS.
+    Nilai kosong/tidak valid dikembalikan None, bukan dihitung dari jam.
     """
-    Mengambil durasi pekerjaan dalam menit dari AppSheet.
-    Menerima angka, string desimal, atau format jam:menit.
-    """
-    if value is None:
+    if value is None or isinstance(value, bool):
         return None
+
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return number if number > 0 else None
 
     text = str(value).strip()
     if not text:
         return None
 
-    text = text.replace(",", ".")
-    if re.match(r"^\d+(?:\.\d+)?$", text):
-        minutes = float(text)
+    text = text.replace("\u00a0", " ").strip()
+    text = re.sub(r"\s+", "", text)
+
+    # Angka menit dengan titik atau koma desimal.
+    numeric = text.replace(",", ".")
+    if re.fullmatch(r"\d+(?:\.\d+)?", numeric):
+        minutes = float(numeric)
         return minutes if minutes > 0 else None
 
-    match = re.match(r"^(\d+):(\d{1,2})(?::(\d{1,2}))?$", text)
-    if match:
-        hours = int(match.group(1))
-        mins = int(match.group(2))
-        seconds = int(match.group(3) or 0)
+    # Format AppSheet Duration: D.HH:MM:SS atau HH:MM:SS.
+    day_match = re.fullmatch(r"(\d+)\.(\d{1,2}):(\d{2}):(\d{2})", text)
+    if day_match:
+        days, hours, mins, seconds = map(int, day_match.groups())
+        total = days * 1440 + hours * 60 + mins + seconds / 60
+        return total if total > 0 else None
+
+    time_match = re.fullmatch(r"(\d{1,3}):(\d{1,2})(?::(\d{1,2}))?", text)
+    if time_match:
+        first, mins, seconds = time_match.groups()
+        first = int(first)
+        mins = int(mins)
+        seconds = int(seconds or 0)
+        if mins > 59 or seconds > 59:
+            return None
+        total = first * 60 + mins + seconds / 60
+        return total if total > 0 else None
+
+    # ISO duration sederhana, misalnya PT1H30M / PT45M.
+    iso_match = re.fullmatch(
+        r"PT(?:(\d+(?:[.,]\d+)?)H)?(?:(\d+(?:[.,]\d+)?)M)?(?:(\d+(?:[.,]\d+)?)S)?",
+        text,
+        flags=re.IGNORECASE
+    )
+    if iso_match:
+        hours, mins, seconds = [float((v or "0").replace(",", ".")) for v in iso_match.groups()]
         total = hours * 60 + mins + seconds / 60
         return total if total > 0 else None
 
@@ -1598,13 +1659,12 @@ def run_appsheet_scraper(date_from, date_to):
             list(rows[0].keys())
         )
 
+        first_duration, first_duration_column = get_appsheet_duration_value(rows[0])
         print(
-            "   Contoh nilai kolom Durasi Pekerjaan:",
-            (
-                get_appsheet_value(rows[0], "Durasi Pekerjaan")
-                or get_appsheet_value(rows[0], "Durasi pekerjaan (menit)")
-                or "(kolom tidak ditemukan/kosong)"
-            )
+            "   Kolom durasi AppSheet yang terdeteksi:",
+            first_duration_column,
+            "| contoh nilai:",
+            repr(first_duration)
         )
 
         if get_appsheet_value(rows[0], "PIC") == "":
@@ -1721,10 +1781,7 @@ def run_appsheet_scraper(date_from, date_to):
             # Prioritaskan nama kolom "Durasi Pekerjaan"; nama dengan
             # keterangan satuan "(menit)" didukung untuk menyesuaikan
             # label kolom yang tampil pada AppSheet.
-            nilai_durasi_appsheet = (
-                get_appsheet_value(item, "Durasi Pekerjaan")
-                or get_appsheet_value(item, "Durasi pekerjaan (menit)")
-            )
+            nilai_durasi_appsheet, nama_kolom_durasi = get_appsheet_duration_value(item)
 
             durasi_menit = parse_appsheet_duration_minutes(
                 nilai_durasi_appsheet
@@ -1788,9 +1845,9 @@ def run_appsheet_scraper(date_from, date_to):
             )
 
             durasi_label = (
-                f"{durasi_menit:.2f} menit (dari kolom Durasi Pekerjaan)"
+                f"{durasi_menit:.2f} menit | sumber={nama_kolom_durasi} | nilai_asli={nilai_durasi_appsheet!r}"
                 if durasi_menit is not None
-                else "KOLOM DURASI PEKERJAAN KOSONG/TIDAK VALID"
+                else f"DURASI KOSONG/TIDAK VALID | kolom={nama_kolom_durasi} | nilai_asli={nilai_durasi_appsheet!r}"
             )
 
             print(
