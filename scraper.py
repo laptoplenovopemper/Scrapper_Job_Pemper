@@ -1598,6 +1598,15 @@ def run_appsheet_scraper(date_from, date_to):
             list(rows[0].keys())
         )
 
+        print(
+            "   Contoh nilai kolom Durasi Pekerjaan:",
+            (
+                get_appsheet_value(rows[0], "Durasi Pekerjaan")
+                or get_appsheet_value(rows[0], "Durasi pekerjaan (menit)")
+                or "(kolom tidak ditemukan/kosong)"
+            )
+        )
+
         if get_appsheet_value(rows[0], "PIC") == "":
 
             print(
@@ -1708,8 +1717,17 @@ def run_appsheet_scraper(date_from, date_to):
                 get_appsheet_value(item, "Waktu Selesai Pekerjaan")
             )
 
+            # DURASI MTTR DIAMBIL LANGSUNG DARI KOLOM DURASI APPSHEET.
+            # Prioritaskan nama kolom "Durasi Pekerjaan"; nama dengan
+            # keterangan satuan "(menit)" didukung untuk menyesuaikan
+            # label kolom yang tampil pada AppSheet.
+            nilai_durasi_appsheet = (
+                get_appsheet_value(item, "Durasi Pekerjaan")
+                or get_appsheet_value(item, "Durasi pekerjaan (menit)")
+            )
+
             durasi_menit = parse_appsheet_duration_minutes(
-                get_appsheet_value(item, "Durasi pekerjaan (menit)")
+                nilai_durasi_appsheet
             )
 
             # ID deterministik untuk membedakan beberapa pekerjaan motor
@@ -1733,13 +1751,9 @@ def run_appsheet_scraper(date_from, date_to):
                 event_identity.encode("utf-8")
             ).hexdigest()[:24]
 
-            # Jika kolom durasi tidak tersedia/kosong, hitung dari
-            # selisih waktu mulai dan selesai sebagai fallback.
-            if durasi_menit is None:
-                durasi_menit = calculate_duration_minutes_from_times(
-                    waktu_mulai,
-                    waktu_selesai
-                )
+            # Tidak menghitung durasi dari waktu mulai/selesai.
+            # Jika kolom Durasi Pekerjaan kosong/tidak valid, biarkan
+            # kosong agar MTTR tidak memakai angka perkiraan.
 
             tgl_terakhir = tanggal_obj.strftime(
                 "%d-%m-%y"
@@ -1774,9 +1788,9 @@ def run_appsheet_scraper(date_from, date_to):
             )
 
             durasi_label = (
-                f"{durasi_menit:.2f} menit"
+                f"{durasi_menit:.2f} menit (dari kolom Durasi Pekerjaan)"
                 if durasi_menit is not None
-                else "DURASI BELUM TERSEDIA"
+                else "KOLOM DURASI PEKERJAAN KOSONG/TIDAK VALID"
             )
 
             print(
