@@ -729,6 +729,8 @@
 
                 toggleBulkDeleteButton();
 
+                return true;
+
             } catch (err) {
 
                 console.error('Gagal memuat history:', err);
@@ -743,6 +745,8 @@
                         </td>
                     </tr>
                 `;
+
+                return false;
             }
         }
 
@@ -1847,21 +1851,32 @@
 
                 closeModal();
 
+                // Muat ulang dari database setelah server mengonfirmasi proses.
+                // Ini memastikan kartu/kelompok dan total motor langsung diperbarui.
+                const refreshed = await loadHistoryData();
+
+                if (!refreshed) {
+                    showNotification(
+                        'Data Terhapus, Tampilan Belum Diperbarui',
+                        'Penghapusan telah diproses, tetapi data terbaru gagal dimuat. Silakan muat ulang halaman.',
+                        false
+                    );
+                    return;
+                }
+
                 if (Number(result.deleted || 0) < 1) {
                     showNotification(
-                        'Tidak Ada Data Dihapus',
-                        result.message || 'Baris tersebut sudah tidak tersedia. Data akan dimuat ulang.',
+                        'Data Tidak Ditemukan',
+                        result.message || 'Riwayat tersebut sudah tidak tersedia. Tampilan telah dimuat ulang.',
                         false
                     );
                 } else {
                     showNotification(
                         'Berhasil',
-                        result.message || 'Riwayat berhasil dihapus!',
+                        result.message || 'Riwayat berhasil dihapus dan tampilan telah diperbarui.',
                         true
                     );
                 }
-
-                await loadHistoryData();
 
             } catch (err) {
                 console.error('Gagal menghapus riwayat:', err);
