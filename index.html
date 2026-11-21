@@ -10,69 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     
-    <!-- MODAL INPUT BATCH SHUTDOWN -->
-    <div id="shutdownModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/60 p-3">
-        <div class="bg-white w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl shadow-2xl">
-            <div class="bg-slate-800 text-white px-5 py-4 flex items-center justify-between">
-                <div>
-                    <h2 class="font-bold text-lg">Catat Kegiatan Shutdown Berkala</h2>
-                    <p class="text-xs text-slate-300">Satu durasi untuk satu batch pekerjaan.</p>
-                </div>
-                <button type="button" onclick="closeShutdownModal()" class="text-white hover:text-slate-300 text-xl" aria-label="Tutup">&times;</button>
-            </div>
-
-            <form id="shutdownForm" onsubmit="saveShutdownBatch(event)" class="p-5 space-y-4">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                        <label for="shutdownDate" class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Shutdown *</label>
-                        <input id="shutdownDate" type="date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label for="shutdownDuration" class="block text-xs font-semibold text-slate-600 mb-1">Durasi Total Shutdown (Jam) *</label>
-                        <input id="shutdownDuration" type="number" min="6" max="12" step="0.1" required placeholder="Contoh: 8" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                        <p class="text-[11px] text-slate-400 mt-1">Masukkan total durasi kegiatan (6–12 jam), bukan durasi per motor.</p>
-                    </div>
-                    <div>
-                        <label for="shutdownPIC" class="block text-xs font-semibold text-slate-600 mb-1">Penanggung Jawab</label>
-                        <input id="shutdownPIC" type="text" placeholder="Nama penanggung jawab" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
-                    <div>
-                        <label for="shutdownNote" class="block text-xs font-semibold text-slate-600 mb-1">Keterangan</label>
-                        <input id="shutdownNote" type="text" placeholder="Catatan kegiatan (opsional)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
-                    </div>
-                </div>
-
-                <div class="border border-slate-200 rounded-lg overflow-hidden">
-                    <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
-                        <div>
-                            <h3 class="text-sm font-bold text-slate-700">Pilih Motor yang Dikerjakan</h3>
-                            <p id="shutdownMachineLabel" class="text-xs text-slate-500">Kelompok FS1</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button type="button" onclick="toggleShutdownMotorSelection(true)" class="text-xs text-sky-700 font-semibold">Pilih Semua</button>
-                            <button type="button" onclick="toggleShutdownMotorSelection(false)" class="text-xs text-slate-500 font-semibold">Kosongkan</button>
-                        </div>
-                    </div>
-                    <div id="shutdownMotorList" class="p-3 max-h-64 overflow-y-auto space-y-2">
-                        <p class="text-sm text-slate-400">Memuat daftar motor...</p>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 pt-2">
-                    <p id="shutdownSelectedCount" class="text-xs text-slate-500">0 motor dipilih</p>
-                    <div class="flex gap-2">
-                        <button type="button" onclick="closeShutdownModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold">Batal</button>
-                        <button id="saveShutdownButton" type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
-                            <i class="fa-solid fa-floppy-disk mr-1"></i> Simpan Kegiatan
-                        </button>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
-
-
-    <script>
+<script>
         tailwind.config = {
             theme: {
                 extend: {
@@ -263,6 +201,67 @@
 </head>
 
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans">
+
+    <!-- MODAL INPUT BATCH SHUTDOWN -->
+    <div id="shutdownModal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-slate-950/60 p-3">
+        <div class="bg-white w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-xl shadow-2xl">
+            <div class="bg-slate-800 text-white px-5 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="font-bold text-lg">Catat Kegiatan Shutdown Berkala</h2>
+                    <p class="text-xs text-slate-300">Daftar motor diambil hanya dari catatan penggantian berjenis BERKALA.</p>
+                </div>
+                <button type="button" onclick="closeShutdownModal()" class="text-white hover:text-slate-300 text-xl" aria-label="Tutup">&times;</button>
+            </div>
+
+            <form id="shutdownForm" onsubmit="saveShutdownBatch(event)" class="p-5 space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="shutdownDate" class="block text-xs font-semibold text-slate-600 mb-1">Tanggal Shutdown *</label>
+                        <input id="shutdownDate" type="date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label for="shutdownDuration" class="block text-xs font-semibold text-slate-600 mb-1">Durasi Total Shutdown (Jam) *</label>
+                        <input id="shutdownDuration" type="number" min="6" max="12" step="0.1" value="12" required placeholder="Contoh: 8" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                        <p class="text-[11px] text-slate-400 mt-1">Masukkan total durasi kegiatan (6–12 jam), bukan durasi per motor.</p>
+                    </div>
+                    <div>
+                        <label for="shutdownPIC" class="block text-xs font-semibold text-slate-600 mb-1">Penanggung Jawab</label>
+                        <input id="shutdownPIC" type="text" placeholder="Nama penanggung jawab" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label for="shutdownNote" class="block text-xs font-semibold text-slate-600 mb-1">Keterangan</label>
+                        <input id="shutdownNote" type="text" placeholder="Catatan kegiatan (opsional)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+
+                <div class="border border-slate-200 rounded-lg overflow-hidden">
+                    <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700">Pilih Motor Berkala yang Dikerjakan</h3>
+                            <p id="shutdownMachineLabel" class="text-xs text-slate-500">Kelompok FS1</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="button" onclick="toggleShutdownMotorSelection(true)" class="text-xs text-sky-700 font-semibold">Pilih Semua</button>
+                            <button type="button" onclick="toggleShutdownMotorSelection(false)" class="text-xs text-slate-500 font-semibold">Kosongkan</button>
+                        </div>
+                    </div>
+                    <div id="shutdownMotorList" class="p-3 max-h-64 overflow-y-auto space-y-2">
+                        <p class="text-sm text-slate-400">Memuat daftar motor...</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 pt-2">
+                    <p id="shutdownSelectedCount" class="text-xs text-slate-500">0 motor dipilih</p>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeShutdownModal()" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold">Batal</button>
+                        <button id="saveShutdownButton" type="submit" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">
+                            <i class="fa-solid fa-floppy-disk mr-1"></i> Simpan Kegiatan
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- HEADER -->
     <header class="bg-pmpDark text-white shadow-md">
@@ -1040,12 +1039,16 @@
                     dateMap.set(key, {
                         key: key,
                         timestamp: date.getTime(),
-                        label: formatDateDDMMYY(record.tglPenggantian)
+                        label: formatDateDDMMYY(record.tglPenggantian),
+                        types: new Set()
                     });
                 }
+
+                dateMap.get(key).types.add(normalizeType(record.keterangan));
             });
 
             return Array.from(dateMap.values())
+                .map(item => ({ ...item, types: Array.from(item.types).sort() }))
                 .sort((a, b) => a.timestamp - b.timestamp);
         }
 
@@ -2019,14 +2022,7 @@
 
             tbody.innerHTML = data.map((item, index) => {
 
-                const type = item.keterangan;
-
-                const typeClass =
-                    type === "PERBAIKAN"
-                        ? "type-perbaikan"
-                        : "type-berkala";
-
-
+                const replacementDates = getMotorReplacementDates(item);
                 const condition = item.condition;
 
 
@@ -2092,8 +2088,8 @@
 
                         <td class="py-3 px-4 min-w-[190px]">
                             <div class="replacement-date-list">
-                                ${getMotorReplacementDates(item).length
-                                    ? getMotorReplacementDates(item).map(date => `
+                                ${replacementDates.length
+                                    ? replacementDates.map(date => `
                                         <button type="button"
                                             class="replacement-date-chip"
                                             data-motor-name="${escapeHtml(item.namaMotor)}"
@@ -2107,17 +2103,26 @@
                                     : '<span class="text-slate-400">—</span>'}
                             </div>
                             <p class="text-[10px] text-slate-400 mt-1">
-                                ${getMotorReplacementDates(item).length} tanggal tercatat · klik untuk detail
+                                ${replacementDates.length} tanggal tercatat · klik untuk detail
                             </p>
                         </td>
 
 
                         <td class="py-3 px-4">
-
-                            <span class="type-chip ${typeClass}">
-                                ${type}
-                            </span>
-
+                            <div class="flex flex-col gap-2 min-w-[125px]">
+                                ${replacementDates.length
+                                    ? replacementDates.map(date => `
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <span class="text-[10px] text-slate-400 font-semibold">${date.label}</span>
+                                            ${date.types.map(type => `
+                                                <span class="type-chip ${type === "PERBAIKAN" ? "type-perbaikan" : "type-berkala"}">
+                                                    ${type}
+                                                </span>
+                                            `).join("")}
+                                        </div>
+                                    `).join("")
+                                    : '<span class="text-slate-400">—</span>'}
+                            </div>
                         </td>
 
 
@@ -2431,7 +2436,11 @@
             const unique = new Map();
 
             allHistoryData
-                .filter(item => normalizeMachine(item.namaMesin) === selectedMachine)
+                .filter(item =>
+                    normalizeMachine(item.namaMesin) === selectedMachine &&
+                    normalizeType(item.keterangan) === "BERKALA" &&
+                    !!parseDate(item.tglPenggantian)
+                )
                 .forEach(item => {
                     const motor = {
                         namaMotor: String(item.namaMotor || "").trim(),
@@ -2466,7 +2475,7 @@
             ].join("-");
 
             document.getElementById("shutdownDate").value = localDate;
-            document.getElementById("shutdownDuration").value = "";
+            document.getElementById("shutdownDuration").value = "12";
             document.getElementById("shutdownPIC").value = "";
             document.getElementById("shutdownNote").value = "";
             document.getElementById("shutdownMachineLabel").textContent =
