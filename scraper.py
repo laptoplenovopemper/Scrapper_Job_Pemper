@@ -1,5 +1,6 @@
 import os
 import re
+import hashlib
 import time
 import requests
 from datetime import datetime, timedelta, date
@@ -1141,7 +1142,11 @@ def run_job_scraper(date_from, date_to):
                         personil,
                         keterangan,
                         periode,
-                        tgl_selanjutnya
+                        tgl_selanjutnya,
+                        "",
+                        "",
+                        "",
+                        ""
                     ]
 
                     processed_data.append(
@@ -1404,6 +1409,107 @@ def get_appsheet_value(item, column_name):
     return ""
 
 
+
+def normalize_appsheet_time(value):
+    """
+    Mengubah nilai waktu AppSheet menjadi teks waktu yang konsisten.
+    Nilai asli tetap dipertahankan bila format tidak dikenali.
+    """
+    if value is None:
+        return ""
+
+    text = str(value).strip()
+    if not text:
+        return ""
+
+    # Format umum AppSheet: 1:30 AM, 01:30, 13:30:00.
+    match = re.match(
+        r"^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$",
+        text,
+        flags=re.IGNORECASE
+    )
+    if not match:
+        return text
+
+    hour = int(match.group(1))
+    minute = int(match.group(2))
+    second = int(match.group(3) or 0)
+    ampm = (match.group(4) or "").upper()
+
+    if minute > 59 or second > 59:
+        return text
+
+    if ampm:
+        if hour < 1 or hour > 12:
+            return text
+        if ampm == "AM":
+            hour = 0 if hour == 12 else hour
+        else:
+            hour = 12 if hour == 12 else hour + 12
+    elif hour > 23:
+        return text
+
+    return f"{hour:02d}:{minute:02d}"
+
+
+def parse_appsheet_duration_minutes(value):
+    """
+    Mengambil durasi pekerjaan dalam menit dari AppSheet.
+    Menerima angka, string desimal, atau format jam:menit.
+    """
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    text = text.replace(",", ".")
+    if re.match(r"^\d+(?:\.\d+)?$", text):
+        minutes = float(text)
+        return minutes if minutes > 0 else None
+
+    match = re.match(r"^(\d+):(\d{1,2})(?::(\d{1,2}))?$", text)
+    if match:
+        hours = int(match.group(1))
+        mins = int(match.group(2))
+        seconds = int(match.group(3) or 0)
+        total = hours * 60 + mins + seconds / 60
+        return total if total > 0 else None
+
+    return None
+
+
+def calculate_duration_minutes_from_times(start_value, end_value):
+    """
+    Fallback jika kolom durasi AppSheet kosong.
+    Mendukung pekerjaan yang melewati tengah malam.
+    """
+    start_text = normalize_appsheet_time(start_value)
+    end_text = normalize_appsheet_time(end_value)
+
+    def to_minutes(value):
+        match = re.match(r"^(\d{1,2}):(\d{2})$", value)
+        if not match:
+            return None
+        hour, minute = int(match.group(1)), int(match.group(2))
+        if hour > 23 or minute > 59:
+            return None
+        return hour * 60 + minute
+
+    start_minutes = to_minutes(start_text)
+    end_minutes = to_minutes(end_text)
+
+    if start_minutes is None or end_minutes is None:
+        return None
+
+    difference = end_minutes - start_minutes
+    if difference < 0:
+        difference += 24 * 60
+
+    return float(difference) if difference > 0 else None
+
+
 def run_appsheet_scraper(date_from, date_to):
 
     print("\n" + "=" * 60)
@@ -1593,6 +1699,48 @@ def run_appsheet_scraper(date_from, date_to):
                     f"{nama_motor}."
                 )
 
+            # WAKTU DAN DURASI PERBAIKAN DARI APPSHEET
+            waktu_mulai = normalize_appsheet_time(
+                get_appsheet_value(item, "Waktu Mulai Pekerjaan")
+            )
+
+            waktu_selesai = normalize_appsheet_time(
+                get_appsheet_value(item, "Waktu Selesai Pekerjaan")
+            )
+
+            durasi_menit = parse_appsheet_duration_minutes(
+                get_appsheet_value(item, "Durasi pekerjaan (menit)")
+            )
+
+            # ID deterministik untuk membedakan beberapa pekerjaan motor
+            # yang mungkin tercatat pada tanggal yang sama.
+            source_key = (
+                get_appsheet_value(item, "ID")
+                or get_appsheet_value(item, "Key")
+                or get_appsheet_value(item, "_RowNumber")
+            )
+            event_identity = "|".join([
+                str(source_key or "").strip(),
+                tanggal_obj.strftime("%Y-%m-%d"),
+                normalize_machine_name(mesin) or "",
+                re.sub(r"[^A-Z0-9]+", " ", str(nama_motor).upper()).strip(),
+                detail_pekerjaan,
+                waktu_mulai,
+                waktu_selesai,
+                personil
+            ])
+            appsheet_record_key = hashlib.sha256(
+                event_identity.encode("utf-8")
+            ).hexdigest()[:24]
+
+            # Jika kolom durasi tidak tersedia/kosong, hitung dari
+            # selisih waktu mulai dan selesai sebagai fallback.
+            if durasi_menit is None:
+                durasi_menit = calculate_duration_minutes_from_times(
+                    waktu_mulai,
+                    waktu_selesai
+                )
+
             tgl_terakhir = tanggal_obj.strftime(
                 "%d-%m-%y"
             )
@@ -1614,17 +1762,28 @@ def run_appsheet_scraper(date_from, date_to):
                 personil,
                 keterangan,
                 periode,
-                tgl_selanjutnya
+                tgl_selanjutnya,
+                waktu_mulai,
+                waktu_selesai,
+                round(durasi_menit, 2) if durasi_menit is not None else "",
+                appsheet_record_key
             ]
 
             processed_data.append(
                 row_final
             )
 
+            durasi_label = (
+                f"{durasi_menit:.2f} menit"
+                if durasi_menit is not None
+                else "DURASI BELUM TERSEDIA"
+            )
+
             print(
                 f"   [PERBAIKAN] {nama_motor} | "
                 f"{nama_mesin} | {sub_mesin} | "
-                f"{tgl_terakhir} | Personil (PIC): {personil}"
+                f"{tgl_terakhir} | {waktu_mulai}-{waktu_selesai} | "
+                f"{durasi_label} | Personil (PIC): {personil}"
             )
 
         except Exception as row_error:
